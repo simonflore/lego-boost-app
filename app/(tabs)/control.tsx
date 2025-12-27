@@ -6,12 +6,15 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useBoost } from '../../src/context/BoostContext';
 import { ControlMode, LedColor } from '../../src/types/lego-boost';
 import { LegoColors, LegoSpacing, LegoBorderRadius } from '../../src/theme/colors';
-import { LegoCard, LegoStudButton, LegoBrickButton } from '../../src/components/LegoComponents';
+import { LegoCard, LegoStudButton, LegoResponsiveContainer } from '../../src/components/LegoComponents';
+import { useDeviceType } from '../../src/hooks/useDeviceType';
 
 const LED_COLORS = [
   { name: 'Off', value: LedColor.OFF, color: LegoColors.ledOff },
@@ -30,6 +33,7 @@ const LED_COLORS = [
 export default function ControlScreen() {
   const { isConnected, boost, controlMode, setControlMode } = useBoost();
   const [activeLed, setActiveLed] = useState<number>(LedColor.OFF);
+  const { isTablet, studButtonSize, contentMaxWidth } = useDeviceType();
 
   const checkConnection = (): boolean => {
     if (!isConnected) {
@@ -60,6 +64,7 @@ export default function ControlScreen() {
 
   const handleLedChange = async (color: number) => {
     if (!checkConnection()) return;
+    Haptics.selectionAsync();
     setActiveLed(color);
     await boost.led(color);
   };
@@ -71,13 +76,14 @@ export default function ControlScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {!isConnected && (
-        <View style={styles.warningBanner}>
-          <Ionicons name="warning" size={20} color={LegoColors.black} />
-          <Text style={styles.warningText}>CONNECT TO LEGO BOOST FIRST</Text>
-        </View>
-      )}
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, isTablet && styles.contentTablet]}>
+      <LegoResponsiveContainer maxWidth={contentMaxWidth}>
+        {!isConnected && (
+          <View style={styles.warningBanner}>
+            <Ionicons name="warning" size={20} color={LegoColors.black} />
+            <Text style={styles.warningText}>CONNECT TO LEGO BOOST FIRST</Text>
+          </View>
+        )}
 
       {/* Control Mode Toggle */}
       <View style={styles.modeContainer}>
@@ -118,9 +124,10 @@ export default function ControlScreen() {
               onPress={() => handleDrive(1)}
               onPressOut={controlMode === ControlMode.Arcade ? handleStop : undefined}
               color={LegoColors.blue}
+              size={studButtonSize}
               disabled={!isConnected}
             >
-              <Ionicons name="arrow-up" size={28} color={LegoColors.white} />
+              <Ionicons name="arrow-up" size={isTablet ? 36 : 28} color={LegoColors.white} />
             </LegoStudButton>
           </View>
 
@@ -129,25 +136,28 @@ export default function ControlScreen() {
             <LegoStudButton
               onPress={() => handleTurn(-1)}
               color={LegoColors.blue}
+              size={studButtonSize}
               disabled={!isConnected}
             >
-              <Ionicons name="arrow-back" size={28} color={LegoColors.white} />
+              <Ionicons name="arrow-back" size={isTablet ? 36 : 28} color={LegoColors.white} />
             </LegoStudButton>
 
             <LegoStudButton
               onPress={handleStop}
               color={LegoColors.red}
+              size={studButtonSize}
               disabled={!isConnected}
             >
-              <Ionicons name="stop" size={28} color={LegoColors.white} />
+              <Ionicons name="stop" size={isTablet ? 36 : 28} color={LegoColors.white} />
             </LegoStudButton>
 
             <LegoStudButton
               onPress={() => handleTurn(1)}
               color={LegoColors.blue}
+              size={studButtonSize}
               disabled={!isConnected}
             >
-              <Ionicons name="arrow-forward" size={28} color={LegoColors.white} />
+              <Ionicons name="arrow-forward" size={isTablet ? 36 : 28} color={LegoColors.white} />
             </LegoStudButton>
           </View>
 
@@ -157,9 +167,10 @@ export default function ControlScreen() {
               onPress={() => handleDrive(-1)}
               onPressOut={controlMode === ControlMode.Arcade ? handleStop : undefined}
               color={LegoColors.blue}
+              size={studButtonSize}
               disabled={!isConnected}
             >
-              <Ionicons name="arrow-down" size={28} color={LegoColors.white} />
+              <Ionicons name="arrow-down" size={isTablet ? 36 : 28} color={LegoColors.white} />
             </LegoStudButton>
           </View>
         </View>
@@ -201,6 +212,7 @@ export default function ControlScreen() {
             : 'Hold buttons for continuous movement. Release to stop.'}
         </Text>
       </LegoCard>
+      </LegoResponsiveContainer>
     </ScrollView>
   );
 }
@@ -212,6 +224,10 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: LegoSpacing.lg,
+  },
+  contentTablet: {
+    paddingHorizontal: LegoSpacing.xl,
+    paddingVertical: LegoSpacing.xl,
   },
   warningBanner: {
     flexDirection: 'row',

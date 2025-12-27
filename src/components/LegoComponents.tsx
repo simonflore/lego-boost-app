@@ -2,12 +2,21 @@ import React from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
   ViewStyle,
-  TextStyle,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  interpolate,
+} from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { LegoColors, LegoBorderRadius, LegoShadow, LegoSpacing } from '../theme/colors';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface LegoBrickButtonProps {
   onPress: () => void;
@@ -30,6 +39,9 @@ export function LegoBrickButton({
   style,
   icon,
 }: LegoBrickButtonProps) {
+  const scale = useSharedValue(1);
+  const translateY = useSharedValue(0);
+
   const sizeStyles = {
     small: { paddingVertical: 10, paddingHorizontal: 16 },
     medium: { paddingVertical: 14, paddingHorizontal: 24 },
@@ -42,15 +54,35 @@ export function LegoBrickButton({
     large: 20,
   };
 
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: scale.value },
+      { translateY: translateY.value },
+    ],
+  }));
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.95, { damping: 15, stiffness: 400 });
+    translateY.value = withSpring(2, { damping: 15, stiffness: 400 });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, { damping: 15, stiffness: 400 });
+    translateY.value = withSpring(0, { damping: 15, stiffness: 400 });
+  };
+
   return (
-    <TouchableOpacity
+    <AnimatedPressable
       onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       disabled={disabled}
-      activeOpacity={0.8}
       style={[
         styles.brickButton,
         sizeStyles[size],
         { backgroundColor: disabled ? LegoColors.mediumGray : color },
+        animatedStyle,
         style,
       ]}
     >
@@ -68,7 +100,7 @@ export function LegoBrickButton({
           {title}
         </Text>
       </View>
-    </TouchableOpacity>
+    </AnimatedPressable>
   );
 }
 
@@ -76,17 +108,37 @@ interface LegoCardProps {
   children: React.ReactNode;
   style?: ViewStyle;
   color?: string;
+  animated?: boolean;
 }
 
-export function LegoCard({ children, style, color }: LegoCardProps) {
+export function LegoCard({ children, style, color, animated = true }: LegoCardProps) {
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(20);
+
+  React.useEffect(() => {
+    if (animated) {
+      opacity.value = withTiming(1, { duration: 400 });
+      translateY.value = withSpring(0, { damping: 15, stiffness: 100 });
+    } else {
+      opacity.value = 1;
+      translateY.value = 0;
+    }
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+
   return (
-    <View style={[
+    <Animated.View style={[
       styles.card,
       color ? { borderLeftColor: color, borderLeftWidth: 6 } : null,
+      animatedStyle,
       style
     ]}>
       {children}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -125,12 +177,36 @@ export function LegoStudButton({
   disabled = false,
   style,
 }: LegoStudButtonProps) {
+  const scale = useSharedValue(1);
+  const innerScale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const innerAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: innerScale.value }],
+  }));
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.9, { damping: 15, stiffness: 400 });
+    innerScale.value = withSpring(0.85, { damping: 15, stiffness: 400 });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, { damping: 15, stiffness: 400 });
+    innerScale.value = withSpring(1, { damping: 15, stiffness: 400 });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onPressOut?.();
+  };
+
   return (
-    <TouchableOpacity
+    <AnimatedPressable
       onPress={onPress}
-      onPressOut={onPressOut}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       disabled={disabled}
-      activeOpacity={0.7}
       style={[
         styles.studButton,
         {
@@ -140,21 +216,23 @@ export function LegoStudButton({
           backgroundColor: disabled ? LegoColors.mediumGray : color,
           borderColor: disabled ? LegoColors.darkGray : shadeColor(color, -30),
         },
+        animatedStyle,
         style,
       ]}
     >
-      <View style={[
+      <Animated.View style={[
         styles.studButtonInner,
         {
           width: size * 0.7,
           height: size * 0.7,
           borderRadius: (size * 0.7) / 2,
           backgroundColor: disabled ? LegoColors.mediumGray : shadeColor(color, 10),
-        }
+        },
+        innerAnimatedStyle,
       ]}>
         {children}
-      </View>
-    </TouchableOpacity>
+      </Animated.View>
+    </AnimatedPressable>
   );
 }
 
@@ -165,11 +243,24 @@ interface LegoBadgeProps {
 }
 
 export function LegoBadge({ color, label, icon }: LegoBadgeProps) {
+  const scale = useSharedValue(0.8);
+  const opacity = useSharedValue(0);
+
+  React.useEffect(() => {
+    scale.value = withSpring(1, { damping: 12, stiffness: 200 });
+    opacity.value = withTiming(1, { duration: 300 });
+  }, [color, label]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
+
   return (
-    <View style={[styles.badge, { backgroundColor: color }]}>
+    <Animated.View style={[styles.badge, { backgroundColor: color }, animatedStyle]}>
       {icon}
       <Text style={styles.badgeText}>{label}</Text>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -178,12 +269,53 @@ interface LegoStatusIndicatorProps {
 }
 
 export function LegoStatusIndicator({ connected }: LegoStatusIndicatorProps) {
+  const scale = useSharedValue(1);
+
+  React.useEffect(() => {
+    // Pulse animation when connected
+    if (connected) {
+      const pulse = () => {
+        scale.value = withSpring(1.2, { damping: 10 }, () => {
+          scale.value = withSpring(1, { damping: 10 });
+        });
+      };
+      pulse();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    }
+  }, [connected]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
   return (
-    <View style={[
+    <Animated.View style={[
       styles.statusIndicator,
-      { backgroundColor: connected ? LegoColors.green : LegoColors.red }
+      { backgroundColor: connected ? LegoColors.green : LegoColors.red },
+      animatedStyle,
     ]}>
       <View style={styles.statusInner} />
+    </Animated.View>
+  );
+}
+
+// Responsive container for iPad layouts
+interface LegoResponsiveContainerProps {
+  children: React.ReactNode;
+  maxWidth?: number;
+  style?: ViewStyle;
+}
+
+export function LegoResponsiveContainer({
+  children,
+  maxWidth = 700,
+  style
+}: LegoResponsiveContainerProps) {
+  return (
+    <View style={[styles.responsiveContainer, { maxWidth }, style]}>
+      {children}
     </View>
   );
 }
@@ -307,5 +439,9 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: 'rgba(255,255,255,0.5)',
+  },
+  responsiveContainer: {
+    width: '100%',
+    alignSelf: 'center',
   },
 });
