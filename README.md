@@ -1,69 +1,62 @@
-# Lego Boost Browser Application
+# LEGO Boost Control
 
-Control Lego Boost from the browser without any installations.
-
-Deployed to: https://legoboost.azurewebsites.net/
+React Native app to control LEGO Boost robots via Bluetooth on iOS and Android.
 
 ## Features
-  * Code control
-    * Control Boost with JavaScript code
-  * Manual control
-    * Control Boost with arrow controls
-  * AI control
-    * Boost drives automatically and evades obstacles
-  * Individual motor control
-    * Control each motor individually
 
-### Manual control
-![Manual Control](docs/manual_control.JPG "Boost Icon")
+- **Connect** - Scan and connect to LEGO Boost Move Hub via BLE
+- **Manual Control** - D-pad for driving/turning with Click or Arcade modes
+- **LED Control** - Change hub LED color (11 colors)
+- **Motor Control** - Individual power control for ports A, B, C, D
+- **AI Mode** - Autonomous obstacle avoidance
+- **Configuration** - Motor presets and fine-tuning
 
-<br/>
+## Requirements
 
-### Code control
-![Code Control](docs/code_control.JPG "Boost Icon")
+- iOS 13.4+ or Android 6.0+
+- LEGO Boost Move Hub (set 17101)
+- Node.js 18+
 
+## Quick Start
 
-## Progressive Web Application
+```bash
+# Install dependencies
+npm install
 
-Application asks permission to add a link to mobile phone's home screen. Application will then open as a standalone application.
+# Install EAS CLI
+npm install -g eas-cli
 
-![Boost Icon](docs/pwa_icon.png "Boost Icon")
+# Log in to Expo
+eas login
 
-## Web Bluetooth API
+# Build development client for iOS
+eas build --profile development --platform ios
 
-Application uses [Web Bluetooth API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Bluetooth_API) to communicate with Lego Boost. 
-
-Web Bluetooth API works with __Windows, Mac, Linux__ and __Android__ (6.0->) devices with __Chrome__ and __Opera__ browsers. Unfortunately Apple iOS doesn't support Web Bluetooth. 
-
-[Supported devices](https://github.com/WebBluetoothCG/web-bluetooth/blob/master/implementation-status.md)
-
-If connection doesn't work, test connection to Lego Boost with [Google's sample tester](https://googlechrome.github.io/samples/web-bluetooth/read-characteristic-value-changed.html).
-
-### Communication module
-
-Uses [lego-boost-browser](https://github.com/ttu/lego-boost-browser) package for device communication and control.
-
-## Run locally
-
-```sh
-$ npm install
-$ npm start
+# Start dev server (after installing the build)
+npm start
 ```
 
-## Docker
+> **Note:** This app requires a custom development build. It will NOT work with Expo Go due to native Bluetooth module requirements.
 
-NOTE: lego-boost-browser package is installed from GitHub. Docker will work after package is released to npm.
+## Project Structure
 
-## Contributing
+```
+app/                      # Expo Router screens (tabs)
+src/
+├── services/
+│   └── LegoBoostService.ts   # BLE protocol implementation
+├── context/
+│   └── BoostContext.tsx      # React context for state
+└── types/
+    └── lego-boost.ts         # TypeScript definitions
+```
 
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+## BLE Protocol
 
-## Disclaimer
-
-LEGO and BOOST are Trademarks from The LEGO Company, which do not support this project. 
-
-Project maintainers are not responsible for any damage on your LEGO BOOST devices - use it at your own risk.
+Communicates with LEGO Boost using LEGO Wireless Protocol 3.0:
+- Service: `00001623-1212-efde-1623-785feabcd123`
+- Characteristic: `00001624-1212-efde-1623-785feabcd123`
 
 ## License
 
-Licensed under the [MIT](https://github.com/ttu/lego-boost-app/blob/master/LICENSE) License.
+MIT - LEGO and BOOST are trademarks of The LEGO Company. Use at your own risk.
