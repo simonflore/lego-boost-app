@@ -10,19 +10,21 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useBoost } from '../../src/context/BoostContext';
 import { ControlMode, LedColor } from '../../src/types/lego-boost';
+import { LegoColors, LegoSpacing, LegoBorderRadius } from '../../src/theme/colors';
+import { LegoCard, LegoStudButton, LegoBrickButton } from '../../src/components/LegoComponents';
 
 const LED_COLORS = [
-  { name: 'Off', value: LedColor.OFF, color: '#333' },
-  { name: 'Pink', value: LedColor.PINK, color: '#ff69b4' },
-  { name: 'Purple', value: LedColor.PURPLE, color: '#800080' },
-  { name: 'Blue', value: LedColor.BLUE, color: '#0000ff' },
-  { name: 'Light Blue', value: LedColor.LIGHT_BLUE, color: '#add8e6' },
-  { name: 'Cyan', value: LedColor.CYAN, color: '#00ffff' },
-  { name: 'Green', value: LedColor.GREEN, color: '#00ff00' },
-  { name: 'Yellow', value: LedColor.YELLOW, color: '#ffff00' },
-  { name: 'Orange', value: LedColor.ORANGE, color: '#ffa500' },
-  { name: 'Red', value: LedColor.RED, color: '#ff0000' },
-  { name: 'White', value: LedColor.WHITE, color: '#ffffff' },
+  { name: 'Off', value: LedColor.OFF, color: LegoColors.ledOff },
+  { name: 'Pink', value: LedColor.PINK, color: LegoColors.ledPink },
+  { name: 'Purple', value: LedColor.PURPLE, color: LegoColors.ledPurple },
+  { name: 'Blue', value: LedColor.BLUE, color: LegoColors.ledBlue },
+  { name: 'Light Blue', value: LedColor.LIGHT_BLUE, color: LegoColors.ledLightBlue },
+  { name: 'Cyan', value: LedColor.CYAN, color: LegoColors.ledCyan },
+  { name: 'Green', value: LedColor.GREEN, color: LegoColors.ledGreen },
+  { name: 'Yellow', value: LedColor.YELLOW, color: LegoColors.ledYellow },
+  { name: 'Orange', value: LedColor.ORANGE, color: LegoColors.ledOrange },
+  { name: 'Red', value: LedColor.RED, color: LegoColors.ledRed },
+  { name: 'White', value: LedColor.WHITE, color: LegoColors.ledWhite },
 ];
 
 export default function ControlScreen() {
@@ -72,77 +74,100 @@ export default function ControlScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {!isConnected && (
         <View style={styles.warningBanner}>
-          <Ionicons name="warning" size={20} color="#856404" />
-          <Text style={styles.warningText}>Connect to LEGO Boost to use controls</Text>
+          <Ionicons name="warning" size={20} color={LegoColors.black} />
+          <Text style={styles.warningText}>CONNECT TO LEGO BOOST FIRST</Text>
         </View>
       )}
 
       {/* Control Mode Toggle */}
       <View style={styles.modeContainer}>
-        <Text style={styles.modeLabel}>Control Mode:</Text>
-        <TouchableOpacity style={styles.modeButton} onPress={toggleControlMode}>
-          <Text style={styles.modeButtonText}>
-            {controlMode === ControlMode.Click ? 'Click' : 'Arcade'}
-          </Text>
+        <TouchableOpacity
+          style={[
+            styles.modeButton,
+            controlMode === ControlMode.Click && styles.modeButtonActive,
+          ]}
+          onPress={() => setControlMode(ControlMode.Click)}
+        >
+          <Text style={[
+            styles.modeButtonText,
+            controlMode === ControlMode.Click && styles.modeButtonTextActive,
+          ]}>CLICK</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.modeButton,
+            controlMode === ControlMode.Arcade && styles.modeButtonActive,
+          ]}
+          onPress={() => setControlMode(ControlMode.Arcade)}
+        >
+          <Text style={[
+            styles.modeButtonText,
+            controlMode === ControlMode.Arcade && styles.modeButtonTextActive,
+          ]}>ARCADE</Text>
         </TouchableOpacity>
       </View>
 
       {/* Direction Controls */}
-      <View style={styles.controlPad}>
-        <Text style={styles.sectionTitle}>Direction Control</Text>
+      <LegoCard color={LegoColors.blue} style={styles.controlCard}>
+        <Text style={styles.cardTitle}>DIRECTION</Text>
 
         <View style={styles.dpadContainer}>
           {/* Up button */}
           <View style={styles.dpadRow}>
-            <TouchableOpacity
-              style={[styles.dpadButton, styles.dpadUp]}
+            <LegoStudButton
               onPress={() => handleDrive(1)}
               onPressOut={controlMode === ControlMode.Arcade ? handleStop : undefined}
+              color={LegoColors.blue}
+              disabled={!isConnected}
             >
-              <Ionicons name="arrow-up" size={32} color="#fff" />
-            </TouchableOpacity>
+              <Ionicons name="arrow-up" size={28} color={LegoColors.white} />
+            </LegoStudButton>
           </View>
 
           {/* Left, Stop, Right buttons */}
           <View style={styles.dpadRow}>
-            <TouchableOpacity
-              style={[styles.dpadButton, styles.dpadLeft]}
+            <LegoStudButton
               onPress={() => handleTurn(-1)}
+              color={LegoColors.blue}
+              disabled={!isConnected}
             >
-              <Ionicons name="arrow-back" size={32} color="#fff" />
-            </TouchableOpacity>
+              <Ionicons name="arrow-back" size={28} color={LegoColors.white} />
+            </LegoStudButton>
 
-            <TouchableOpacity
-              style={[styles.dpadButton, styles.dpadCenter]}
+            <LegoStudButton
               onPress={handleStop}
+              color={LegoColors.red}
+              disabled={!isConnected}
             >
-              <Ionicons name="stop" size={32} color="#fff" />
-            </TouchableOpacity>
+              <Ionicons name="stop" size={28} color={LegoColors.white} />
+            </LegoStudButton>
 
-            <TouchableOpacity
-              style={[styles.dpadButton, styles.dpadRight]}
+            <LegoStudButton
               onPress={() => handleTurn(1)}
+              color={LegoColors.blue}
+              disabled={!isConnected}
             >
-              <Ionicons name="arrow-forward" size={32} color="#fff" />
-            </TouchableOpacity>
+              <Ionicons name="arrow-forward" size={28} color={LegoColors.white} />
+            </LegoStudButton>
           </View>
 
           {/* Down button */}
           <View style={styles.dpadRow}>
-            <TouchableOpacity
-              style={[styles.dpadButton, styles.dpadDown]}
+            <LegoStudButton
               onPress={() => handleDrive(-1)}
               onPressOut={controlMode === ControlMode.Arcade ? handleStop : undefined}
+              color={LegoColors.blue}
+              disabled={!isConnected}
             >
-              <Ionicons name="arrow-down" size={32} color="#fff" />
-            </TouchableOpacity>
+              <Ionicons name="arrow-down" size={28} color={LegoColors.white} />
+            </LegoStudButton>
           </View>
         </View>
-      </View>
+      </LegoCard>
 
       {/* LED Colors */}
-      <View style={styles.ledContainer}>
-        <Text style={styles.sectionTitle}>LED Color</Text>
+      <LegoCard color={LegoColors.orange} style={styles.ledCard}>
+        <Text style={styles.cardTitle}>LED COLOR</Text>
         <View style={styles.ledGrid}>
           {LED_COLORS.map((led) => (
             <TouchableOpacity
@@ -151,29 +176,31 @@ export default function ControlScreen() {
                 styles.ledButton,
                 { backgroundColor: led.color },
                 activeLed === led.value && styles.ledButtonActive,
-                led.value === LedColor.OFF && styles.ledButtonOff,
               ]}
               onPress={() => handleLedChange(led.value)}
             >
               {led.value === LedColor.OFF && (
-                <Ionicons name="close" size={20} color="#fff" />
+                <Ionicons name="close" size={18} color={LegoColors.white} />
+              )}
+              {activeLed === led.value && led.value !== LedColor.OFF && (
+                <Ionicons name="checkmark" size={18} color={led.value === LedColor.WHITE || led.value === LedColor.YELLOW ? LegoColors.black : LegoColors.white} />
               )}
             </TouchableOpacity>
           ))}
         </View>
-      </View>
+      </LegoCard>
 
       {/* Mode Description */}
-      <View style={styles.infoBox}>
-        <Text style={styles.infoTitle}>
-          {controlMode === ControlMode.Click ? 'Click Mode' : 'Arcade Mode'}
+      <LegoCard color={LegoColors.green}>
+        <Text style={styles.cardTitle}>
+          {controlMode === ControlMode.Click ? 'CLICK MODE' : 'ARCADE MODE'}
         </Text>
-        <Text style={styles.infoText}>
+        <Text style={styles.modeDescription}>
           {controlMode === ControlMode.Click
-            ? 'Tap buttons to send individual commands. Robot moves for a fixed duration.'
+            ? 'Tap buttons to send commands. Robot moves for a fixed duration.'
             : 'Hold buttons for continuous movement. Release to stop.'}
         </Text>
-      </View>
+      </LegoCard>
     </ScrollView>
   );
 }
@@ -181,61 +208,63 @@ export default function ControlScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: LegoColors.background,
   },
   content: {
-    padding: 20,
+    padding: LegoSpacing.lg,
   },
   warningBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff3cd',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 20,
+    justifyContent: 'center',
+    backgroundColor: LegoColors.yellow,
+    padding: LegoSpacing.md,
+    borderRadius: LegoBorderRadius.brick,
+    marginBottom: LegoSpacing.lg,
+    borderWidth: 3,
+    borderColor: '#d4a900',
   },
   warningText: {
-    color: '#856404',
-    marginLeft: 10,
+    color: LegoColors.black,
+    marginLeft: LegoSpacing.sm,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   modeContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },
-  modeLabel: {
-    fontSize: 16,
-    color: '#333',
-    marginRight: 10,
+    backgroundColor: LegoColors.lightGray,
+    borderRadius: LegoBorderRadius.brick,
+    padding: 4,
+    marginBottom: LegoSpacing.lg,
   },
   modeButton: {
-    backgroundColor: '#2185d0',
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 20,
+    flex: 1,
+    paddingVertical: LegoSpacing.md,
+    alignItems: 'center',
+    borderRadius: LegoBorderRadius.medium,
+  },
+  modeButtonActive: {
+    backgroundColor: LegoColors.red,
   },
   modeButtonText: {
-    color: '#fff',
-    fontWeight: '600',
+    fontWeight: '800',
+    fontSize: 14,
+    color: LegoColors.darkGray,
+    letterSpacing: 1,
   },
-  controlPad: {
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  modeButtonTextActive: {
+    color: LegoColors.white,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 20,
+  controlCard: {
+    marginBottom: LegoSpacing.lg,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: LegoColors.black,
+    letterSpacing: 1,
+    marginBottom: LegoSpacing.lg,
     textAlign: 'center',
-    color: '#333',
   },
   dpadContainer: {
     alignItems: 'center',
@@ -243,76 +272,35 @@ const styles = StyleSheet.create({
   dpadRow: {
     flexDirection: 'row',
     justifyContent: 'center',
+    gap: LegoSpacing.md,
+    marginVertical: LegoSpacing.xs,
   },
-  dpadButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    margin: 5,
-  },
-  dpadUp: {
-    backgroundColor: '#2185d0',
-  },
-  dpadDown: {
-    backgroundColor: '#2185d0',
-  },
-  dpadLeft: {
-    backgroundColor: '#2185d0',
-  },
-  dpadRight: {
-    backgroundColor: '#2185d0',
-  },
-  dpadCenter: {
-    backgroundColor: '#db2828',
-  },
-  ledContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  ledCard: {
+    marginBottom: LegoSpacing.lg,
   },
   ledGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
+    gap: LegoSpacing.sm,
   },
   ledButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    margin: 6,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#ddd',
+    borderWidth: 3,
+    borderColor: 'rgba(0,0,0,0.2)',
   },
   ledButtonActive: {
-    borderColor: '#333',
-    borderWidth: 3,
+    borderColor: LegoColors.black,
+    borderWidth: 4,
   },
-  ledButtonOff: {
-    backgroundColor: '#333',
-  },
-  infoBox: {
-    backgroundColor: '#e8f4fd',
-    borderRadius: 10,
-    padding: 15,
-  },
-  infoTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#2185d0',
-    marginBottom: 5,
-  },
-  infoText: {
-    color: '#555',
+  modeDescription: {
+    color: LegoColors.darkGray,
+    fontSize: 14,
     lineHeight: 20,
+    fontWeight: '500',
   },
 });

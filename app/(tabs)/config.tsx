@@ -5,16 +5,17 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Switch,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
 import { useBoost } from '../../src/context/BoostContext';
+import { LegoColors, LegoSpacing, LegoBorderRadius } from '../../src/theme/colors';
+import { LegoCard, LegoBrickButton } from '../../src/components/LegoComponents';
 
 const MOTOR_PRESETS = [
-  { name: 'Vernie', leftMotor: 'A' as const, rightMotor: 'B' as const },
-  { name: 'Car (A/B back)', leftMotor: 'B' as const, rightMotor: 'A' as const },
-  { name: 'Car (A/B front)', leftMotor: 'A' as const, rightMotor: 'B' as const },
+  { name: 'VERNIE', leftMotor: 'A' as const, rightMotor: 'B' as const, icon: 'body' },
+  { name: 'CAR (A/B BACK)', leftMotor: 'B' as const, rightMotor: 'A' as const, icon: 'car-sport' },
+  { name: 'CAR (A/B FRONT)', leftMotor: 'A' as const, rightMotor: 'B' as const, icon: 'car' },
 ];
 
 export default function ConfigScreen() {
@@ -46,15 +47,15 @@ export default function ConfigScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Configuration</Text>
-      <Text style={styles.subtitle}>
-        Adjust motor settings and fine-tune controls
-      </Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>SETTINGS</Text>
+        <Text style={styles.subtitle}>Configure your robot</Text>
+      </View>
 
       {/* Motor Presets */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Motor Configuration</Text>
-        <Text style={styles.sectionDescription}>
+      <LegoCard color={LegoColors.blue} style={styles.card}>
+        <Text style={styles.cardTitle}>MOTOR CONFIGURATION</Text>
+        <Text style={styles.cardDescription}>
           Select a preset based on your LEGO Boost model
         </Text>
 
@@ -72,12 +73,15 @@ export default function ConfigScreen() {
                 ]}
                 onPress={() => handlePresetSelect(preset)}
               >
-                <Text
-                  style={[
-                    styles.presetButtonText,
-                    isActive && styles.presetButtonTextActive,
-                  ]}
-                >
+                <Ionicons
+                  name={preset.icon as any}
+                  size={24}
+                  color={isActive ? LegoColors.white : LegoColors.darkGray}
+                />
+                <Text style={[
+                  styles.presetButtonText,
+                  isActive && styles.presetButtonTextActive,
+                ]}>
                   {preset.name}
                 </Text>
               </TouchableOpacity>
@@ -87,42 +91,51 @@ export default function ConfigScreen() {
 
         <View style={styles.motorAssignment}>
           <View style={styles.motorRow}>
-            <Text style={styles.motorLabel}>Left Motor:</Text>
-            <Text style={styles.motorValue}>{configuration.leftMotor}</Text>
+            <Text style={styles.motorLabel}>LEFT MOTOR</Text>
+            <View style={[styles.motorBadge, { backgroundColor: LegoColors.blue }]}>
+              <Text style={styles.motorBadgeText}>{configuration.leftMotor}</Text>
+            </View>
           </View>
           <View style={styles.motorRow}>
-            <Text style={styles.motorLabel}>Right Motor:</Text>
-            <Text style={styles.motorValue}>{configuration.rightMotor}</Text>
+            <Text style={styles.motorLabel}>RIGHT MOTOR</Text>
+            <View style={[styles.motorBadge, { backgroundColor: LegoColors.green }]}>
+              <Text style={styles.motorBadgeText}>{configuration.rightMotor}</Text>
+            </View>
           </View>
         </View>
-      </View>
+      </LegoCard>
 
       {/* Fine-tuning */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Fine-tuning</Text>
-        <Text style={styles.sectionDescription}>
-          Adjust these values if your robot doesn't drive straight or turns too much/little
+      <LegoCard color={LegoColors.orange} style={styles.card}>
+        <Text style={styles.cardTitle}>FINE-TUNING</Text>
+        <Text style={styles.cardDescription}>
+          Adjust if your robot doesn't drive straight
         </Text>
 
         {/* Drive Finetune */}
         <View style={styles.sliderSection}>
           <View style={styles.sliderHeader}>
-            <Text style={styles.sliderLabel}>Drive Modifier</Text>
-            <Text style={styles.sliderValue}>
-              {(configuration.driveFinetune || 1).toFixed(2)}
+            <View style={styles.sliderLabelRow}>
+              <Ionicons name="speedometer" size={20} color={LegoColors.orange} />
+              <Text style={styles.sliderLabel}>Drive Modifier</Text>
+            </View>
+            <Text style={[styles.sliderValue, { color: LegoColors.orange }]}>
+              {(configuration.driveFinetune || 1).toFixed(2)}x
             </Text>
           </View>
-          <Slider
-            style={styles.slider}
-            minimumValue={0.5}
-            maximumValue={2}
-            step={0.01}
-            value={configuration.driveFinetune || 1}
-            onValueChange={handleDriveFinetuneChange}
-            minimumTrackTintColor="#2185d0"
-            maximumTrackTintColor="#ddd"
-            thumbTintColor="#2185d0"
-          />
+          <View style={styles.sliderTrack}>
+            <Slider
+              style={styles.slider}
+              minimumValue={0.5}
+              maximumValue={2}
+              step={0.01}
+              value={configuration.driveFinetune || 1}
+              onValueChange={handleDriveFinetuneChange}
+              minimumTrackTintColor={LegoColors.orange}
+              maximumTrackTintColor={LegoColors.lightGray}
+              thumbTintColor={LegoColors.orange}
+            />
+          </View>
           <View style={styles.sliderLabels}>
             <Text style={styles.sliderMinMax}>0.5x</Text>
             <Text style={styles.sliderMinMax}>2.0x</Text>
@@ -132,54 +145,78 @@ export default function ConfigScreen() {
         {/* Turn Finetune */}
         <View style={styles.sliderSection}>
           <View style={styles.sliderHeader}>
-            <Text style={styles.sliderLabel}>Turn Modifier</Text>
-            <Text style={styles.sliderValue}>
-              {(configuration.turnFinetune || 1).toFixed(2)}
+            <View style={styles.sliderLabelRow}>
+              <Ionicons name="refresh" size={20} color={LegoColors.blue} />
+              <Text style={styles.sliderLabel}>Turn Modifier</Text>
+            </View>
+            <Text style={[styles.sliderValue, { color: LegoColors.blue }]}>
+              {(configuration.turnFinetune || 1).toFixed(2)}x
             </Text>
           </View>
-          <Slider
-            style={styles.slider}
-            minimumValue={0.5}
-            maximumValue={2}
-            step={0.01}
-            value={configuration.turnFinetune || 1}
-            onValueChange={handleTurnFinetuneChange}
-            minimumTrackTintColor="#2185d0"
-            maximumTrackTintColor="#ddd"
-            thumbTintColor="#2185d0"
-          />
+          <View style={styles.sliderTrack}>
+            <Slider
+              style={styles.slider}
+              minimumValue={0.5}
+              maximumValue={2}
+              step={0.01}
+              value={configuration.turnFinetune || 1}
+              onValueChange={handleTurnFinetuneChange}
+              minimumTrackTintColor={LegoColors.blue}
+              maximumTrackTintColor={LegoColors.lightGray}
+              thumbTintColor={LegoColors.blue}
+            />
+          </View>
           <View style={styles.sliderLabels}>
             <Text style={styles.sliderMinMax}>0.5x</Text>
             <Text style={styles.sliderMinMax}>2.0x</Text>
           </View>
         </View>
-      </View>
+      </LegoCard>
 
       {/* Reset Button */}
-      <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
-        <Ionicons name="refresh" size={20} color="#fff" />
-        <Text style={styles.resetButtonText}>Reset to Defaults</Text>
-      </TouchableOpacity>
-
-      {/* Help */}
-      <View style={styles.helpBox}>
-        <Text style={styles.helpTitle}>Configuration Tips</Text>
-        <Text style={styles.helpText}>
-          • <Text style={styles.bold}>Vernie:</Text> Standard humanoid robot{'\n'}
-          • <Text style={styles.bold}>Drive Modifier:</Text> Increase if robot doesn't
-          go far enough, decrease if it overshoots{'\n'}
-          • <Text style={styles.bold}>Turn Modifier:</Text> Increase if turns are too
-          small, decrease if they're too large
-        </Text>
+      <View style={styles.buttonContainer}>
+        <LegoBrickButton
+          onPress={handleReset}
+          title="Reset to Defaults"
+          color={LegoColors.darkGray}
+          size="medium"
+          icon={<Ionicons name="refresh" size={20} color={LegoColors.white} />}
+        />
       </View>
+
+      {/* Tips */}
+      <LegoCard color={LegoColors.yellow}>
+        <Text style={styles.cardTitle}>TIPS</Text>
+        <View style={styles.tipsList}>
+          <View style={styles.tipItem}>
+            <View style={[styles.tipDot, { backgroundColor: LegoColors.blue }]} />
+            <Text style={styles.tipText}>
+              <Text style={styles.tipBold}>Vernie:</Text> Standard humanoid robot
+            </Text>
+          </View>
+          <View style={styles.tipItem}>
+            <View style={[styles.tipDot, { backgroundColor: LegoColors.orange }]} />
+            <Text style={styles.tipText}>
+              <Text style={styles.tipBold}>Drive:</Text> Increase if robot doesn't go far enough
+            </Text>
+          </View>
+          <View style={styles.tipItem}>
+            <View style={[styles.tipDot, { backgroundColor: LegoColors.green }]} />
+            <Text style={styles.tipText}>
+              <Text style={styles.tipBold}>Turn:</Text> Increase if turns are too small
+            </Text>
+          </View>
+        </View>
+      </LegoCard>
 
       {/* App Info */}
       <View style={styles.appInfo}>
-        <Text style={styles.appInfoText}>LEGO Boost Control</Text>
+        <View style={styles.appInfoLogo}>
+          <Ionicons name="cube" size={32} color={LegoColors.red} />
+        </View>
+        <Text style={styles.appInfoName}>LEGO BOOST CONTROL</Text>
         <Text style={styles.appInfoVersion}>Version 1.0.0</Text>
-        <Text style={styles.appInfoNote}>
-          Built with React Native & Expo
-        </Text>
+        <Text style={styles.appInfoNote}>Built with React Native & Expo</Text>
       </View>
     </ScrollView>
   );
@@ -188,105 +225,126 @@ export default function ConfigScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: LegoColors.background,
   },
   content: {
-    padding: 20,
+    padding: LegoSpacing.lg,
+  },
+  header: {
+    marginBottom: LegoSpacing.lg,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 5,
+    fontSize: 28,
+    fontWeight: '900',
+    color: LegoColors.black,
+    letterSpacing: 1,
   },
   subtitle: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 25,
-  },
-  section: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 5,
-  },
-  sectionDescription: {
-    fontSize: 13,
-    color: '#888',
-    marginBottom: 15,
-  },
-  presetContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 15,
-  },
-  presetButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
-    borderWidth: 2,
-    borderColor: '#f0f0f0',
-  },
-  presetButtonActive: {
-    backgroundColor: '#e8f4fd',
-    borderColor: '#2185d0',
-  },
-  presetButtonText: {
-    color: '#666',
+    color: LegoColors.darkGray,
+    marginTop: 4,
     fontWeight: '500',
   },
+  card: {
+    marginBottom: LegoSpacing.lg,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: LegoColors.black,
+    letterSpacing: 1,
+    marginBottom: LegoSpacing.xs,
+  },
+  cardDescription: {
+    fontSize: 13,
+    color: LegoColors.darkGray,
+    marginBottom: LegoSpacing.lg,
+    fontWeight: '500',
+  },
+  presetContainer: {
+    gap: LegoSpacing.sm,
+    marginBottom: LegoSpacing.lg,
+  },
+  presetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: LegoSpacing.md,
+    borderRadius: LegoBorderRadius.medium,
+    backgroundColor: LegoColors.lightGray,
+    borderWidth: 3,
+    borderColor: LegoColors.lightGray,
+  },
+  presetButtonActive: {
+    backgroundColor: LegoColors.blue,
+    borderColor: '#003d8f',
+  },
+  presetButtonText: {
+    marginLeft: LegoSpacing.md,
+    fontWeight: '800',
+    fontSize: 14,
+    color: LegoColors.darkGray,
+    letterSpacing: 0.5,
+  },
   presetButtonTextActive: {
-    color: '#2185d0',
-    fontWeight: '600',
+    color: LegoColors.white,
   },
   motorAssignment: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    padding: 12,
+    backgroundColor: LegoColors.lightGray,
+    borderRadius: LegoBorderRadius.medium,
+    padding: LegoSpacing.md,
   },
   motorRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 5,
+    alignItems: 'center',
+    paddingVertical: LegoSpacing.xs,
   },
   motorLabel: {
-    color: '#666',
+    fontSize: 13,
+    color: LegoColors.darkGray,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
-  motorValue: {
-    fontWeight: '600',
-    color: '#333',
+  motorBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  motorBadgeText: {
+    color: LegoColors.white,
+    fontSize: 14,
+    fontWeight: '900',
   },
   sliderSection: {
-    marginBottom: 20,
+    marginBottom: LegoSpacing.lg,
   },
   sliderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: LegoSpacing.sm,
+  },
+  sliderLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   sliderLabel: {
-    fontSize: 15,
-    color: '#333',
-    fontWeight: '500',
+    marginLeft: LegoSpacing.sm,
+    fontSize: 14,
+    color: LegoColors.black,
+    fontWeight: '700',
   },
   sliderValue: {
-    fontSize: 16,
-    color: '#2185d0',
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  sliderTrack: {
+    backgroundColor: LegoColors.lightGray,
+    borderRadius: 10,
+    height: 40,
+    justifyContent: 'center',
   },
   slider: {
     width: '100%',
@@ -295,62 +353,72 @@ const styles = StyleSheet.create({
   sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 4,
   },
   sliderMinMax: {
-    fontSize: 12,
-    color: '#999',
+    fontSize: 11,
+    color: LegoColors.mediumGray,
+    fontWeight: '700',
   },
-  resetButton: {
-    flexDirection: 'row',
+  buttonContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#767676',
-    paddingVertical: 14,
-    borderRadius: 10,
-    marginBottom: 20,
+    marginBottom: LegoSpacing.lg,
   },
-  resetButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+  tipsList: {
+    gap: LegoSpacing.sm,
   },
-  helpBox: {
-    backgroundColor: '#e8f4fd',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
+  tipItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
-  helpTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#2185d0',
-    marginBottom: 10,
+  tipDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginTop: 4,
+    marginRight: LegoSpacing.sm,
   },
-  helpText: {
-    color: '#555',
-    lineHeight: 22,
+  tipText: {
+    flex: 1,
+    fontSize: 13,
+    color: LegoColors.darkGray,
+    fontWeight: '500',
+    lineHeight: 18,
   },
-  bold: {
-    fontWeight: '600',
+  tipBold: {
+    fontWeight: '800',
+    color: LegoColors.black,
   },
   appInfo: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: LegoSpacing.xl,
+    marginTop: LegoSpacing.md,
   },
-  appInfoText: {
+  appInfoLogo: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: LegoColors.lightGray,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: LegoSpacing.sm,
+  },
+  appInfoName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#666',
+    fontWeight: '900',
+    color: LegoColors.black,
+    letterSpacing: 1,
   },
   appInfoVersion: {
     fontSize: 13,
-    color: '#999',
-    marginTop: 3,
+    color: LegoColors.darkGray,
+    marginTop: 2,
+    fontWeight: '600',
   },
   appInfoNote: {
     fontSize: 12,
-    color: '#aaa',
-    marginTop: 3,
+    color: LegoColors.mediumGray,
+    marginTop: 2,
+    fontWeight: '500',
   },
 });

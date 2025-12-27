@@ -3,13 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ActivityIndicator,
   ScrollView,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useBoost } from '../../src/context/BoostContext';
+import { LegoColors, LegoSpacing, LegoBorderRadius } from '../../src/theme/colors';
+import { LegoBrickButton, LegoCard, LegoHeader } from '../../src/components/LegoComponents';
 
 export default function ConnectScreen() {
   const { isConnected, isConnecting, deviceInfo, connect, disconnect } = useBoost();
@@ -24,107 +24,125 @@ export default function ConnectScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Ionicons
-          name="cube"
-          size={80}
-          color={isConnected ? '#21ba45' : '#2185d0'}
-        />
-        <Text style={styles.title}>LEGO Boost</Text>
-        <Text style={styles.subtitle}>
-          {isConnected ? 'Connected' : 'Not Connected'}
+      {/* Hero Section */}
+      <View style={styles.hero}>
+        <View style={[styles.iconContainer, isConnected && styles.iconConnected]}>
+          <Ionicons
+            name="cube"
+            size={64}
+            color={LegoColors.white}
+          />
+        </View>
+        <Text style={styles.statusText}>
+          {isConnected ? 'CONNECTED' : 'NOT CONNECTED'}
         </Text>
+        <View style={[styles.statusBar, isConnected && styles.statusBarConnected]} />
       </View>
 
-      <TouchableOpacity
-        style={[
-          styles.connectButton,
-          isConnected && styles.disconnectButton,
-          isConnecting && styles.connectingButton,
-        ]}
-        onPress={handleConnect}
-        disabled={isConnecting}
-      >
+      {/* Connect Button */}
+      <View style={styles.buttonContainer}>
         {isConnecting ? (
-          <ActivityIndicator color="#fff" size="small" />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator color={LegoColors.red} size="large" />
+            <Text style={styles.loadingText}>SCANNING FOR HUB...</Text>
+          </View>
         ) : (
-          <>
-            <Ionicons
-              name={isConnected ? 'close-circle' : 'bluetooth'}
-              size={24}
-              color="#fff"
-              style={styles.buttonIcon}
-            />
-            <Text style={styles.buttonText}>
-              {isConnected ? 'Disconnect' : 'Connect'}
-            </Text>
-          </>
+          <LegoBrickButton
+            onPress={handleConnect}
+            title={isConnected ? 'Disconnect' : 'Connect'}
+            color={isConnected ? LegoColors.darkGray : LegoColors.blue}
+            size="large"
+            icon={
+              <Ionicons
+                name={isConnected ? 'close' : 'bluetooth'}
+                size={24}
+                color={LegoColors.white}
+              />
+            }
+          />
         )}
-      </TouchableOpacity>
+      </View>
 
-      {isConnecting && (
-        <Text style={styles.scanningText}>
-          Scanning for LEGO Boost hub...{'\n'}
-          Make sure your hub is turned on
-        </Text>
-      )}
-
+      {/* Error Message */}
       {deviceInfo.error ? (
-        <View style={styles.errorContainer}>
-          <Ionicons name="warning" size={24} color="#db2828" />
-          <Text style={styles.errorText}>{deviceInfo.error}</Text>
-        </View>
+        <LegoCard color={LegoColors.red} style={styles.errorCard}>
+          <View style={styles.errorContent}>
+            <Ionicons name="warning" size={24} color={LegoColors.red} />
+            <Text style={styles.errorText}>{deviceInfo.error}</Text>
+          </View>
+        </LegoCard>
       ) : null}
 
+      {/* Device Info */}
       {isConnected && (
-        <View style={styles.infoContainer}>
-          <Text style={styles.infoTitle}>Device Information</Text>
+        <LegoCard color={LegoColors.green} style={styles.infoCard}>
+          <Text style={styles.cardTitle}>DEVICE INFO</Text>
 
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Distance:</Text>
-            <Text style={styles.infoValue}>{deviceInfo.distance} cm</Text>
+          <View style={styles.infoGrid}>
+            <View style={styles.infoItem}>
+              <View style={[styles.infoIcon, { backgroundColor: LegoColors.blue }]}>
+                <Ionicons name="resize" size={20} color={LegoColors.white} />
+              </View>
+              <Text style={styles.infoLabel}>Distance</Text>
+              <Text style={styles.infoValue}>{deviceInfo.distance} cm</Text>
+            </View>
+
+            <View style={styles.infoItem}>
+              <View style={[styles.infoIcon, { backgroundColor: LegoColors.orange }]}>
+                <Ionicons name="color-palette" size={20} color={LegoColors.white} />
+              </View>
+              <Text style={styles.infoLabel}>Color</Text>
+              <Text style={styles.infoValue}>{deviceInfo.color || 'N/A'}</Text>
+            </View>
+
+            <View style={styles.infoItem}>
+              <View style={[styles.infoIcon, { backgroundColor: LegoColors.green }]}>
+                <Ionicons name="sync" size={20} color={LegoColors.white} />
+              </View>
+              <Text style={styles.infoLabel}>Roll</Text>
+              <Text style={styles.infoValue}>{deviceInfo.tilt.roll}°</Text>
+            </View>
+
+            <View style={styles.infoItem}>
+              <View style={[styles.infoIcon, { backgroundColor: LegoColors.red }]}>
+                <Ionicons name="swap-vertical" size={20} color={LegoColors.white} />
+              </View>
+              <Text style={styles.infoLabel}>Pitch</Text>
+              <Text style={styles.infoValue}>{deviceInfo.tilt.pitch}°</Text>
+            </View>
           </View>
 
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Color:</Text>
-            <Text style={styles.infoValue}>{deviceInfo.color || 'N/A'}</Text>
+          <View style={styles.motorInfo}>
+            <View style={styles.motorRow}>
+              <Text style={styles.motorLabel}>Motor A</Text>
+              <Text style={styles.motorValue}>{deviceInfo.ports.A.angle}°</Text>
+            </View>
+            <View style={styles.motorRow}>
+              <Text style={styles.motorLabel}>Motor B</Text>
+              <Text style={styles.motorValue}>{deviceInfo.ports.B.angle}°</Text>
+            </View>
           </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Tilt:</Text>
-            <Text style={styles.infoValue}>
-              Roll: {deviceInfo.tilt.roll}° / Pitch: {deviceInfo.tilt.pitch}°
-            </Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Motor A:</Text>
-            <Text style={styles.infoValue}>{deviceInfo.ports.A.angle}°</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Motor B:</Text>
-            <Text style={styles.infoValue}>{deviceInfo.ports.B.angle}°</Text>
-          </View>
-        </View>
+        </LegoCard>
       )}
 
-      <View style={styles.helpContainer}>
-        <Text style={styles.helpTitle}>How to Connect</Text>
-        <Text style={styles.helpText}>
-          1. Turn on your LEGO Boost Move Hub{'\n'}
-          2. Make sure Bluetooth is enabled on your device{'\n'}
-          3. Press the Connect button above{'\n'}
-          4. Wait for the connection to establish
-        </Text>
-
-        {Platform.OS === 'ios' && (
-          <Text style={styles.noteText}>
-            Note: This app requires a development build with Bluetooth support.
-            It will not work in Expo Go.
-          </Text>
-        )}
-      </View>
+      {/* Instructions */}
+      <LegoCard color={LegoColors.yellow} style={styles.helpCard}>
+        <Text style={styles.cardTitle}>HOW TO CONNECT</Text>
+        <View style={styles.stepList}>
+          <View style={styles.step}>
+            <View style={styles.stepNumber}><Text style={styles.stepNumberText}>1</Text></View>
+            <Text style={styles.stepText}>Turn on your LEGO Boost Move Hub</Text>
+          </View>
+          <View style={styles.step}>
+            <View style={styles.stepNumber}><Text style={styles.stepNumberText}>2</Text></View>
+            <Text style={styles.stepText}>Enable Bluetooth on your device</Text>
+          </View>
+          <View style={styles.step}>
+            <View style={styles.stepNumber}><Text style={styles.stepNumberText}>3</Text></View>
+            <Text style={styles.stepText}>Press the Connect button above</Text>
+          </View>
+        </View>
+      </LegoCard>
     </ScrollView>
   );
 }
@@ -132,130 +150,167 @@ export default function ConnectScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: LegoColors.background,
   },
   content: {
-    padding: 20,
+    padding: LegoSpacing.lg,
+  },
+  hero: {
     alignItems: 'center',
+    marginBottom: LegoSpacing.xl,
+    marginTop: LegoSpacing.md,
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 30,
-    marginTop: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 15,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 5,
-  },
-  connectButton: {
-    flexDirection: 'row',
+  iconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: LegoColors.mediumGray,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2185d0',
-    paddingVertical: 15,
-    paddingHorizontal: 40,
-    borderRadius: 10,
-    minWidth: 200,
+    borderWidth: 6,
+    borderColor: LegoColors.darkGray,
+    marginBottom: LegoSpacing.md,
   },
-  disconnectButton: {
-    backgroundColor: '#db2828',
+  iconConnected: {
+    backgroundColor: LegoColors.green,
+    borderColor: '#1a5c32',
   },
-  connectingButton: {
-    backgroundColor: '#999',
-  },
-  buttonIcon: {
-    marginRight: 10,
-  },
-  buttonText: {
-    color: '#fff',
+  statusText: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '900',
+    color: LegoColors.black,
+    letterSpacing: 2,
   },
-  scanningText: {
-    marginTop: 15,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 22,
+  statusBar: {
+    width: 100,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: LegoColors.mediumGray,
+    marginTop: LegoSpacing.sm,
   },
-  errorContainer: {
+  statusBarConnected: {
+    backgroundColor: LegoColors.green,
+  },
+  buttonContainer: {
+    alignItems: 'center',
+    marginBottom: LegoSpacing.xl,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    padding: LegoSpacing.lg,
+  },
+  loadingText: {
+    marginTop: LegoSpacing.md,
+    fontSize: 14,
+    fontWeight: '700',
+    color: LegoColors.darkGray,
+    letterSpacing: 1,
+  },
+  errorCard: {
+    marginBottom: LegoSpacing.lg,
+  },
+  errorContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff6f6',
-    padding: 15,
-    borderRadius: 8,
-    marginTop: 20,
-    borderWidth: 1,
-    borderColor: '#e0b4b4',
   },
   errorText: {
-    color: '#db2828',
-    marginLeft: 10,
     flex: 1,
-  },
-  infoContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 20,
-    marginTop: 30,
-    width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  infoTitle: {
-    fontSize: 18,
+    marginLeft: LegoSpacing.md,
+    color: LegoColors.red,
     fontWeight: '600',
-    marginBottom: 15,
-    color: '#333',
   },
-  infoRow: {
+  infoCard: {
+    marginBottom: LegoSpacing.lg,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: LegoColors.black,
+    letterSpacing: 1,
+    marginBottom: LegoSpacing.md,
+  },
+  infoGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    flexWrap: 'wrap',
+    marginHorizontal: -LegoSpacing.xs,
+  },
+  infoItem: {
+    width: '50%',
+    padding: LegoSpacing.xs,
+    alignItems: 'center',
+    marginBottom: LegoSpacing.md,
+  },
+  infoIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: LegoSpacing.xs,
   },
   infoLabel: {
-    color: '#666',
-    fontSize: 15,
+    fontSize: 12,
+    color: LegoColors.darkGray,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   infoValue: {
-    color: '#333',
-    fontSize: 15,
-    fontWeight: '500',
+    fontSize: 18,
+    fontWeight: '800',
+    color: LegoColors.black,
   },
-  helpContainer: {
-    backgroundColor: '#e8f4fd',
-    borderRadius: 10,
-    padding: 20,
-    marginTop: 30,
-    width: '100%',
+  motorInfo: {
+    borderTopWidth: 2,
+    borderTopColor: LegoColors.lightGray,
+    paddingTop: LegoSpacing.md,
+    marginTop: LegoSpacing.sm,
   },
-  helpTitle: {
-    fontSize: 16,
+  motorRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: LegoSpacing.xs,
+  },
+  motorLabel: {
+    fontSize: 14,
+    color: LegoColors.darkGray,
+    fontWeight: '700',
+  },
+  motorValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: LegoColors.black,
+  },
+  helpCard: {
+    marginBottom: LegoSpacing.lg,
+  },
+  stepList: {
+    gap: LegoSpacing.md,
+  },
+  step: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stepNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: LegoColors.yellow,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: LegoSpacing.md,
+    borderWidth: 2,
+    borderColor: '#d4a900',
+  },
+  stepNumberText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: LegoColors.black,
+  },
+  stepText: {
+    flex: 1,
+    fontSize: 14,
+    color: LegoColors.darkGray,
     fontWeight: '600',
-    marginBottom: 10,
-    color: '#2185d0',
-  },
-  helpText: {
-    color: '#555',
-    lineHeight: 24,
-  },
-  noteText: {
-    marginTop: 15,
-    color: '#856404',
-    backgroundColor: '#fff3cd',
-    padding: 10,
-    borderRadius: 5,
-    fontSize: 13,
   },
 });

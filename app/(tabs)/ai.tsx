@@ -3,12 +3,22 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
-  Alert,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useBoost } from '../../src/context/BoostContext';
+import { LegoColors, LegoSpacing, LegoBorderRadius } from '../../src/theme/colors';
+import { LegoCard, LegoBrickButton, LegoBadge } from '../../src/components/LegoComponents';
+
+const STATE_CONFIG: Record<string, { color: string; icon: string }> = {
+  Drive: { color: LegoColors.green, icon: 'arrow-up-circle' },
+  Back: { color: LegoColors.orange, icon: 'arrow-down-circle' },
+  Turn: { color: LegoColors.blue, icon: 'refresh-circle' },
+  Seek: { color: '#6435c9', icon: 'search-circle' },
+  Manual: { color: LegoColors.darkGray, icon: 'hand-left' },
+  Stopped: { color: LegoColors.red, icon: 'pause-circle' },
+};
 
 export default function AiScreen() {
   const { isConnected, boost, deviceInfo } = useBoost();
@@ -16,7 +26,6 @@ export default function AiScreen() {
   const [currentState, setCurrentState] = useState<string>('Stopped');
 
   useEffect(() => {
-    // Update state from control data
     const interval = setInterval(() => {
       if (isRunning) {
         setCurrentState(boost.controlData.state || 'Unknown');
@@ -27,7 +36,6 @@ export default function AiScreen() {
   }, [isRunning]);
 
   useEffect(() => {
-    // Stop AI when leaving screen
     return () => {
       if (boost.isAiRunning) {
         boost.stopAi();
@@ -52,140 +60,131 @@ export default function AiScreen() {
     }
   };
 
-  const getStateColor = (state: string): string => {
-    switch (state) {
-      case 'Drive':
-        return '#21ba45';
-      case 'Back':
-        return '#f2711c';
-      case 'Turn':
-        return '#2185d0';
-      case 'Seek':
-        return '#6435c9';
-      case 'Manual':
-        return '#767676';
-      default:
-        return '#333';
-    }
-  };
-
-  const getStateIcon = (state: string): string => {
-    switch (state) {
-      case 'Drive':
-        return 'arrow-up-circle';
-      case 'Back':
-        return 'arrow-down-circle';
-      case 'Turn':
-        return 'refresh-circle';
-      case 'Seek':
-        return 'search-circle';
-      default:
-        return 'pause-circle';
-    }
-  };
+  const stateConfig = STATE_CONFIG[currentState] || STATE_CONFIG.Stopped;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {!isConnected && (
         <View style={styles.warningBanner}>
-          <Ionicons name="warning" size={20} color="#856404" />
-          <Text style={styles.warningText}>Connect to LEGO Boost to use AI mode</Text>
+          <Ionicons name="warning" size={20} color={LegoColors.black} />
+          <Text style={styles.warningText}>CONNECT TO LEGO BOOST FIRST</Text>
         </View>
       )}
 
-      <View style={styles.header}>
-        <Ionicons
-          name="flash"
-          size={60}
-          color={isRunning ? '#fbbd08' : '#ccc'}
-        />
-        <Text style={styles.title}>Autonomous Mode</Text>
-        <Text style={styles.subtitle}>
-          Robot automatically avoids obstacles
-        </Text>
+      {/* Hero */}
+      <View style={styles.hero}>
+        <View style={[styles.robotIcon, isRunning && styles.robotIconActive]}>
+          <Ionicons
+            name="flash"
+            size={48}
+            color={LegoColors.white}
+          />
+        </View>
+        <Text style={styles.title}>AI MODE</Text>
+        <Text style={styles.subtitle}>Autonomous obstacle avoidance</Text>
       </View>
 
-      {/* Current State Display */}
-      <View style={styles.stateContainer}>
-        <Text style={styles.stateLabel}>Current State</Text>
-        <View
-          style={[
-            styles.stateBadge,
-            { backgroundColor: getStateColor(currentState) },
-          ]}
-        >
-          <Ionicons
-            name={getStateIcon(currentState) as any}
-            size={24}
-            color="#fff"
-          />
-          <Text style={styles.stateText}>{currentState}</Text>
-        </View>
+      {/* Current State */}
+      <View style={styles.stateSection}>
+        <Text style={styles.stateLabel}>CURRENT STATE</Text>
+        <LegoBadge
+          color={stateConfig.color}
+          label={currentState.toUpperCase()}
+          icon={<Ionicons name={stateConfig.icon as any} size={24} color={LegoColors.white} />}
+        />
       </View>
 
       {/* Sensor Data */}
-      <View style={styles.sensorContainer}>
-        <Text style={styles.sectionTitle}>Sensor Data</Text>
+      <LegoCard color={LegoColors.blue} style={styles.sensorCard}>
+        <Text style={styles.cardTitle}>SENSORS</Text>
 
-        <View style={styles.sensorRow}>
+        <View style={styles.sensorGrid}>
           <View style={styles.sensorItem}>
-            <Ionicons name="resize" size={24} color="#2185d0" />
-            <Text style={styles.sensorLabel}>Distance</Text>
-            <Text style={styles.sensorValue}>{deviceInfo.distance} cm</Text>
+            <View style={[styles.sensorIcon, { backgroundColor: LegoColors.blue }]}>
+              <Ionicons name="resize" size={24} color={LegoColors.white} />
+            </View>
+            <Text style={styles.sensorValue}>{deviceInfo.distance}</Text>
+            <Text style={styles.sensorLabel}>Distance (cm)</Text>
           </View>
 
           <View style={styles.sensorItem}>
-            <Ionicons name="color-palette" size={24} color="#2185d0" />
-            <Text style={styles.sensorLabel}>Color</Text>
+            <View style={[styles.sensorIcon, { backgroundColor: LegoColors.orange }]}>
+              <Ionicons name="color-palette" size={24} color={LegoColors.white} />
+            </View>
             <Text style={styles.sensorValue}>{deviceInfo.color || 'N/A'}</Text>
+            <Text style={styles.sensorLabel}>Color</Text>
           </View>
-        </View>
 
-        <View style={styles.sensorRow}>
           <View style={styles.sensorItem}>
-            <Ionicons name="sync" size={24} color="#2185d0" />
-            <Text style={styles.sensorLabel}>Roll</Text>
+            <View style={[styles.sensorIcon, { backgroundColor: LegoColors.green }]}>
+              <Ionicons name="sync" size={24} color={LegoColors.white} />
+            </View>
             <Text style={styles.sensorValue}>{deviceInfo.tilt.roll}°</Text>
+            <Text style={styles.sensorLabel}>Roll</Text>
           </View>
 
           <View style={styles.sensorItem}>
-            <Ionicons name="swap-vertical" size={24} color="#2185d0" />
-            <Text style={styles.sensorLabel}>Pitch</Text>
+            <View style={[styles.sensorIcon, { backgroundColor: LegoColors.red }]}>
+              <Ionicons name="swap-vertical" size={24} color={LegoColors.white} />
+            </View>
             <Text style={styles.sensorValue}>{deviceInfo.tilt.pitch}°</Text>
+            <Text style={styles.sensorLabel}>Pitch</Text>
           </View>
         </View>
-      </View>
+      </LegoCard>
 
       {/* Start/Stop Button */}
-      <TouchableOpacity
-        style={[
-          styles.actionButton,
-          isRunning ? styles.stopButton : styles.startButton,
-          !isConnected && styles.disabledButton,
-        ]}
-        onPress={handleToggleAi}
-        disabled={!isConnected}
-      >
-        <Ionicons
-          name={isRunning ? 'stop' : 'play'}
-          size={28}
-          color="#fff"
+      <View style={styles.buttonContainer}>
+        <LegoBrickButton
+          onPress={handleToggleAi}
+          title={isRunning ? 'Stop AI' : 'Start AI'}
+          color={isRunning ? LegoColors.red : LegoColors.green}
+          size="large"
+          disabled={!isConnected}
+          icon={
+            <Ionicons
+              name={isRunning ? 'stop' : 'play'}
+              size={28}
+              color={LegoColors.white}
+            />
+          }
         />
-        <Text style={styles.actionButtonText}>
-          {isRunning ? 'Stop AI' : 'Start AI'}
-        </Text>
-      </TouchableOpacity>
-
-      {/* AI Behavior Description */}
-      <View style={styles.helpBox}>
-        <Text style={styles.helpTitle}>How AI Mode Works</Text>
-        <Text style={styles.helpText}>
-          <Text style={styles.stateHighlight}>Seek:</Text> Looking for path{'\n'}
-          <Text style={styles.stateHighlight}>Drive:</Text> Moving forward{'\n'}
-          <Text style={styles.stateHighlight}>Back:</Text> Obstacle detected, reversing{'\n'}
-          <Text style={styles.stateHighlight}>Turn:</Text> Finding new direction
-        </Text>
       </View>
+
+      {/* AI Behavior */}
+      <LegoCard color={LegoColors.yellow}>
+        <Text style={styles.cardTitle}>HOW IT WORKS</Text>
+        <View style={styles.behaviorList}>
+          <View style={styles.behaviorItem}>
+            <View style={[styles.behaviorDot, { backgroundColor: '#6435c9' }]} />
+            <View style={styles.behaviorTextContainer}>
+              <Text style={styles.behaviorTitle}>SEEK</Text>
+              <Text style={styles.behaviorDesc}>Looking for path</Text>
+            </View>
+          </View>
+          <View style={styles.behaviorItem}>
+            <View style={[styles.behaviorDot, { backgroundColor: LegoColors.green }]} />
+            <View style={styles.behaviorTextContainer}>
+              <Text style={styles.behaviorTitle}>DRIVE</Text>
+              <Text style={styles.behaviorDesc}>Moving forward</Text>
+            </View>
+          </View>
+          <View style={styles.behaviorItem}>
+            <View style={[styles.behaviorDot, { backgroundColor: LegoColors.orange }]} />
+            <View style={styles.behaviorTextContainer}>
+              <Text style={styles.behaviorTitle}>BACK</Text>
+              <Text style={styles.behaviorDesc}>Obstacle detected</Text>
+            </View>
+          </View>
+          <View style={styles.behaviorItem}>
+            <View style={[styles.behaviorDot, { backgroundColor: LegoColors.blue }]} />
+            <View style={styles.behaviorTextContainer}>
+              <Text style={styles.behaviorTitle}>TURN</Text>
+              <Text style={styles.behaviorDesc}>Finding new direction</Text>
+            </View>
+          </View>
+        </View>
+      </LegoCard>
     </ScrollView>
   );
 }
@@ -193,137 +192,142 @@ export default function AiScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: LegoColors.background,
   },
   content: {
-    padding: 20,
+    padding: LegoSpacing.lg,
   },
   warningBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff3cd',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 20,
+    justifyContent: 'center',
+    backgroundColor: LegoColors.yellow,
+    padding: LegoSpacing.md,
+    borderRadius: LegoBorderRadius.brick,
+    marginBottom: LegoSpacing.lg,
+    borderWidth: 3,
+    borderColor: '#d4a900',
   },
   warningText: {
-    color: '#856404',
-    marginLeft: 10,
+    color: LegoColors.black,
+    marginLeft: LegoSpacing.sm,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
-  header: {
+  hero: {
     alignItems: 'center',
-    marginBottom: 25,
+    marginBottom: LegoSpacing.xl,
+  },
+  robotIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: LegoColors.mediumGray,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 5,
+    borderColor: LegoColors.darkGray,
+    marginBottom: LegoSpacing.md,
+  },
+  robotIconActive: {
+    backgroundColor: LegoColors.yellow,
+    borderColor: '#d4a900',
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 10,
+    fontSize: 28,
+    fontWeight: '900',
+    color: LegoColors.black,
+    letterSpacing: 2,
   },
   subtitle: {
     fontSize: 14,
-    color: '#666',
-    marginTop: 5,
+    color: LegoColors.darkGray,
+    marginTop: 4,
+    fontWeight: '500',
   },
-  stateContainer: {
+  stateSection: {
     alignItems: 'center',
-    marginBottom: 25,
+    marginBottom: LegoSpacing.xl,
   },
   stateLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 10,
+    fontSize: 12,
+    fontWeight: '700',
+    color: LegoColors.darkGray,
+    letterSpacing: 1,
+    marginBottom: LegoSpacing.sm,
   },
-  stateBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 25,
-    borderRadius: 30,
+  sensorCard: {
+    marginBottom: LegoSpacing.lg,
   },
-  stateText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-    marginLeft: 10,
-  },
-  sensorContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 25,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  sectionTitle: {
+  cardTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 15,
+    fontWeight: '900',
+    color: LegoColors.black,
+    letterSpacing: 1,
+    marginBottom: LegoSpacing.lg,
+    textAlign: 'center',
   },
-  sensorRow: {
+  sensorGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 15,
+    flexWrap: 'wrap',
   },
   sensorItem: {
+    width: '50%',
     alignItems: 'center',
-    flex: 1,
+    marginBottom: LegoSpacing.lg,
   },
-  sensorLabel: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 5,
-  },
-  sensorValue: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginTop: 3,
-  },
-  actionButton: {
-    flexDirection: 'row',
+  sensorIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 18,
-    borderRadius: 12,
-    marginBottom: 25,
+    marginBottom: LegoSpacing.xs,
   },
-  startButton: {
-    backgroundColor: '#21ba45',
-  },
-  stopButton: {
-    backgroundColor: '#db2828',
-  },
-  disabledButton: {
-    backgroundColor: '#ccc',
-  },
-  actionButtonText: {
-    color: '#fff',
+  sensorValue: {
     fontSize: 20,
+    fontWeight: '900',
+    color: LegoColors.black,
+  },
+  sensorLabel: {
+    fontSize: 11,
+    color: LegoColors.darkGray,
     fontWeight: '600',
-    marginLeft: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  helpBox: {
-    backgroundColor: '#e8f4fd',
-    borderRadius: 10,
-    padding: 15,
+  buttonContainer: {
+    alignItems: 'center',
+    marginBottom: LegoSpacing.xl,
   },
-  helpTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#2185d0',
-    marginBottom: 10,
+  behaviorList: {
+    gap: LegoSpacing.md,
   },
-  helpText: {
-    color: '#555',
-    lineHeight: 24,
+  behaviorItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  stateHighlight: {
-    fontWeight: '600',
-    color: '#333',
+  behaviorDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginRight: LegoSpacing.md,
+  },
+  behaviorTextContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  behaviorTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: LegoColors.black,
+    letterSpacing: 0.5,
+  },
+  behaviorDesc: {
+    fontSize: 13,
+    color: LegoColors.darkGray,
+    fontWeight: '500',
   },
 });
