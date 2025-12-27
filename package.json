@@ -1,52 +1,42 @@
 {
   "name": "lego-boost-app",
-  "version": "0.10.0",
-  "homepage": "https://legoboost.azurewebsites.net/",
+  "version": "1.0.0",
+  "description": "Control LEGO Boost from iOS using React Native and Bluetooth",
+  "main": "expo-router/entry",
   "scripts": {
-    "start": "rescripts start",
-    "build": "rescripts build",
-    "test": "rescripts test --env=jsdom",
-    "eject": "rescripts eject",
-    "lint": "tsc --noEmit && tslint --project ./tsconfig.json"
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "build:dev": "eas build --profile development --platform ios",
+    "build:preview": "eas build --profile preview --platform ios",
+    "lint": "eslint ."
   },
   "dependencies": {
-    "lego-boost-browser": "git+https://github.com/ttu/lego-boost-browser.git",
-    "local-storage": "^1.4.2",
-    "monaco-editor-webpack-plugin": "^1.9.0",
-    "preval.macro": "^3.0.0",
-    "react": "^16.13.1",
-    "react-dom": "^16.13.1",
-    "react-monaco-editor": "^0.26.2",
-    "react-router-dom": "^5.2.0",
-    "react-scripts": "^2.1.8",
-    "react-semantic-ui-range": "^0.7.0",
-    "semantic-ui-react": "^0.87.3"
+    "@react-navigation/native": "^6.1.9",
+    "@react-navigation/bottom-tabs": "^6.5.11",
+    "expo": "~50.0.0",
+    "expo-dev-client": "~3.3.0",
+    "expo-status-bar": "~1.11.0",
+    "expo-router": "~3.4.0",
+    "expo-linking": "~6.2.0",
+    "expo-constants": "~15.4.0",
+    "react": "18.2.0",
+    "react-native": "0.73.2",
+    "react-native-ble-plx": "^3.1.2",
+    "@react-native-community/slider": "^4.5.0",
+    "buffer": "^6.0.3",
+    "react-native-safe-area-context": "4.8.2",
+    "react-native-screens": "~3.29.0",
+    "react-native-gesture-handler": "~2.14.0",
+    "@expo/vector-icons": "^14.0.0",
+    "expo-build-properties": "~0.11.0"
   },
   "devDependencies": {
-    "@rescripts/cli": "^0.0.11",
-    "@rescripts/rescript-env": "^0.0.10",
-    "@rescripts/utilities": "^0.0.5",
-    "@types/jest": "^24.9.1",
-    "@types/local-storage": "^1.4.0",
-    "@types/node": "^12.12.48",
-    "@types/react": "^16.9.41",
-    "@types/react-dom": "^16.9.8",
-    "@types/react-monaco-editor": "^0.16.0",
-    "@types/react-router-dom": "^4.3.5",
-    "prettier": "^1.19.1",
-    "tslint": "^5.20.1",
-    "tslint-config-prettier": "^1.18.0",
-    "tslint-react": "^4.1.0",
-    "typescript": "~3.9.6"
+    "@babel/core": "^7.23.0",
+    "@types/react": "~18.2.45",
+    "typescript": "^5.3.0",
+    "eslint": "^8.56.0"
   },
-  "browserslist": [
-    ">0.2%",
-    "not dead",
-    "not ie <= 11",
-    "not op_mini all"
-  ],
-  "rescripts": [
-    "env",
-    ".rescriptsrc.js"
-  ]
+  "private": true
 }

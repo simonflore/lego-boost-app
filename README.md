@@ -1,69 +1,143 @@
-# Lego Boost Browser Application
+# LEGO Boost Control - React Native App
 
-Control Lego Boost from the browser without any installations.
-
-Deployed to: https://legoboost.azurewebsites.net/
+Control your LEGO Boost robot from iOS using Bluetooth Low Energy.
 
 ## Features
-  * Code control
-    * Control Boost with JavaScript code
-  * Manual control
-    * Control Boost with arrow controls
-  * AI control
-    * Boost drives automatically and evades obstacles
-  * Individual motor control
-    * Control each motor individually
 
-### Manual control
-![Manual Control](docs/manual_control.JPG "Boost Icon")
+- **Connect**: Scan and connect to your LEGO Boost Move Hub via Bluetooth
+- **Manual Control**: Directional pad for driving and turning
+- **LED Control**: Change the hub's LED color
+- **Motor Control**: Individual control of all motor ports (A, B, C, D)
+- **AI Mode**: Autonomous obstacle avoidance
+- **Configuration**: Fine-tune motor settings for your specific build
 
-<br/>
+## Requirements
 
-### Code control
-![Code Control](docs/code_control.JPG "Boost Icon")
+- iOS 13.4 or later
+- LEGO Boost Move Hub (set 17101)
+- Expo CLI
+- EAS CLI (for building)
 
+## Important Note: Expo Go Limitation
 
-## Progressive Web Application
+**This app requires a custom development build and will NOT work with the standard Expo Go app.**
 
-Application asks permission to add a link to mobile phone's home screen. Application will then open as a standalone application.
+This is because the app uses `react-native-ble-plx` for Bluetooth Low Energy communication, which is a native module not included in Expo Go.
 
-![Boost Icon](docs/pwa_icon.png "Boost Icon")
+## Getting Started
 
-## Web Bluetooth API
+### 1. Install Dependencies
 
-Application uses [Web Bluetooth API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Bluetooth_API) to communicate with Lego Boost. 
-
-Web Bluetooth API works with __Windows, Mac, Linux__ and __Android__ (6.0->) devices with __Chrome__ and __Opera__ browsers. Unfortunately Apple iOS doesn't support Web Bluetooth. 
-
-[Supported devices](https://github.com/WebBluetoothCG/web-bluetooth/blob/master/implementation-status.md)
-
-If connection doesn't work, test connection to Lego Boost with [Google's sample tester](https://googlechrome.github.io/samples/web-bluetooth/read-characteristic-value-changed.html).
-
-### Communication module
-
-Uses [lego-boost-browser](https://github.com/ttu/lego-boost-browser) package for device communication and control.
-
-## Run locally
-
-```sh
-$ npm install
-$ npm start
+```bash
+npm install
 ```
 
-## Docker
+### 2. Install EAS CLI (if not already installed)
 
-NOTE: lego-boost-browser package is installed from GitHub. Docker will work after package is released to npm.
+```bash
+npm install -g eas-cli
+```
 
-## Contributing
+### 3. Log in to Expo
 
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+```bash
+eas login
+```
+
+### 4. Build Development Client
+
+For iOS Simulator:
+```bash
+eas build --profile development --platform ios
+```
+
+For physical iOS device:
+```bash
+eas build --profile development --platform ios
+```
+
+Note: Building for a physical device requires an Apple Developer account.
+
+### 5. Install the Development Build
+
+After the build completes, download and install the development build on your device or simulator.
+
+### 6. Start the Development Server
+
+```bash
+npm start
+```
+
+Then press `i` to open in iOS simulator, or scan the QR code with your development build app.
+
+## Project Structure
+
+```
+lego-boost-app/
+├── app/                    # Expo Router screens
+│   ├── _layout.tsx         # Root layout with BoostProvider
+│   └── (tabs)/             # Tab-based navigation
+│       ├── index.tsx       # Connect screen
+│       ├── control.tsx     # Manual control with d-pad
+│       ├── motors.tsx      # Individual motor control
+│       ├── ai.tsx          # Autonomous mode
+│       └── config.tsx      # Configuration
+├── src/
+│   ├── services/
+│   │   └── LegoBoostService.ts  # BLE communication service
+│   ├── context/
+│   │   └── BoostContext.tsx     # React context for state
+│   └── types/
+│       └── lego-boost.ts        # TypeScript type definitions
+├── assets/                 # App icons and splash screen
+├── app.json                # Expo configuration
+├── eas.json                # EAS Build configuration
+└── package.json
+```
+
+## How to Use
+
+1. **Power on** your LEGO Boost Move Hub (the button on top)
+2. **Open the app** and go to the Connect tab
+3. **Tap Connect** - the app will scan for nearby hubs
+4. **Wait for connection** - the status indicator will turn green
+5. **Control your robot** using the Control, Motors, or AI tabs
+
+## Troubleshooting
+
+### "No LEGO Boost hub found"
+- Make sure the hub is turned on (white light should be blinking)
+- Ensure Bluetooth is enabled on your iOS device
+- Try turning the hub off and on again
+- Make sure the hub isn't connected to another device
+
+### "Bluetooth permission denied"
+- Go to Settings > Privacy > Bluetooth and enable access for this app
+
+### App crashes on launch
+- Make sure you're using a development build, not Expo Go
+- Rebuild the development client
+
+## Technology Stack
+
+- **React Native** with Expo
+- **Expo Router** for navigation
+- **react-native-ble-plx** for Bluetooth LE
+- **TypeScript** for type safety
+
+## LEGO Boost Protocol
+
+This app communicates with the LEGO Boost Move Hub using the LEGO Wireless Protocol 3.0 over Bluetooth Low Energy.
+
+- **Service UUID**: `00001623-1212-efde-1623-785feabcd123`
+- **Characteristic UUID**: `00001624-1212-efde-1623-785feabcd123`
 
 ## Disclaimer
 
-LEGO and BOOST are Trademarks from The LEGO Company, which do not support this project. 
+LEGO and BOOST are Trademarks from The LEGO Company, which do not support this project.
 
 Project maintainers are not responsible for any damage on your LEGO BOOST devices - use it at your own risk.
 
 ## License
 
-Licensed under the [MIT](https://github.com/ttu/lego-boost-app/blob/master/LICENSE) License.
+Licensed under the [MIT](LICENSE) License.
