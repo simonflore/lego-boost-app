@@ -11,6 +11,13 @@ React Native app to control LEGO Boost robots via Bluetooth on iOS and Android.
 - **AI Mode** - Autonomous obstacle avoidance
 - **Configuration** - Motor presets and fine-tuning
 
+## Tech Stack
+
+- **React Native** 0.81 with Expo SDK 54
+- **Expo Router** for file-based navigation
+- **react-native-ble-plx** for Bluetooth LE
+- **TypeScript** throughout
+
 ## Requirements
 
 - iOS 13.4+ or Android 6.0+
@@ -30,7 +37,7 @@ npm install -g eas-cli
 eas login
 
 # Build development client for iOS
-eas build --profile development --platform ios
+npm run build:dev
 
 # Start dev server (after installing the build)
 npm start
@@ -38,15 +45,41 @@ npm start
 
 > **Note:** This app requires a custom development build. It will NOT work with Expo Go due to native Bluetooth module requirements.
 
+## Available Scripts
+
+```bash
+npm start            # Start Expo dev server
+npm run ios          # Run on iOS simulator
+npm run android      # Run on Android emulator
+npm run build:dev    # Build iOS development client via EAS
+npm run build:preview # Build iOS preview build via EAS
+npm run lint         # Run ESLint
+```
+
 ## Project Structure
 
 ```
-app/                      # Expo Router screens (tabs)
+app/                          # Expo Router screens
+├── _layout.tsx               # Root layout
+└── (tabs)/                   # Tab navigation
+    ├── _layout.tsx           # Tab bar configuration
+    ├── index.tsx             # Connect screen
+    ├── control.tsx           # Manual control screen
+    ├── motors.tsx            # Motor control screen
+    ├── ai.tsx                # AI autonomous mode
+    └── config.tsx            # Configuration screen
 src/
+├── components/
+│   └── LegoComponents.tsx    # Shared UI components
+├── context/
+│   └── BoostContext.tsx      # React context for BLE state
+├── hooks/
+│   ├── useDeviceType.ts      # Device detection hook
+│   └── useHaptics.ts         # Haptic feedback hook
 ├── services/
 │   └── LegoBoostService.ts   # BLE protocol implementation
-├── context/
-│   └── BoostContext.tsx      # React context for state
+├── theme/
+│   └── colors.ts             # App color palette
 └── types/
     └── lego-boost.ts         # TypeScript definitions
 ```
@@ -56,6 +89,19 @@ src/
 Communicates with LEGO Boost using LEGO Wireless Protocol 3.0:
 - Service: `00001623-1212-efde-1623-785feabcd123`
 - Characteristic: `00001624-1212-efde-1623-785feabcd123`
+
+Commands are sent as byte arrays. See `LegoBoostService.ts` for protocol implementation.
+
+## Development
+
+### Adding New Motor Commands
+1. Add method to `src/services/LegoBoostService.ts`
+2. Use `this.write([...bytes])` to send command
+3. Expose via `useBoost()` hook from context
+
+### Adding New Screens
+1. Create a new file in `app/(tabs)/`
+2. Update `app/(tabs)/_layout.tsx` to add the tab
 
 ## License
 
