@@ -86,11 +86,6 @@ export function LegoBrickButton({
         style,
       ]}
     >
-      {/* Stud decoration */}
-      <View style={[styles.studRow, { backgroundColor: disabled ? LegoColors.mediumGray : color }]}>
-        <View style={[styles.stud, { borderColor: disabled ? LegoColors.darkGray : shadeColor(color, -20) }]} />
-        <View style={[styles.stud, { borderColor: disabled ? LegoColors.darkGray : shadeColor(color, -20) }]} />
-      </View>
       <View style={styles.buttonContent}>
         {icon}
         <Text style={[
@@ -347,21 +342,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderBottomWidth: 4,
     borderBottomColor: 'rgba(0,0,0,0.2)',
-    position: 'relative',
-    overflow: 'visible',
-  },
-  studRow: {
-    position: 'absolute',
-    top: -8,
-    flexDirection: 'row',
-    gap: 12,
-  },
-  stud: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderWidth: 2,
   },
   buttonContent: {
     flexDirection: 'row',
