@@ -64,6 +64,16 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="gamepad"
+        options={{
+          title: 'PS4',
+          headerTitle: 'PS4 CONTROLLER',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="logo-playstation" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="motors"
         options={{
           title: 'Motors',

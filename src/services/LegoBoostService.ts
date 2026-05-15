@@ -384,6 +384,14 @@ class LegoBoostService {
     ]);
   }
 
+  // Continuous dual-motor control with no time limit (for analog stick input)
+  async driveWithPower(powerA: number, powerB: number): Promise<void> {
+    const pA = Math.max(-100, Math.min(100, Math.round(powerA)));
+    const pB = Math.max(-100, Math.min(100, Math.round(powerB)));
+    // 0x08 = StartSpeed for synchronized dual-port, runs until stopped
+    await this.write([0x0b, 0x00, 0x81, PortId.AB, 0x11, 0x08, pA, pB, 0x64, 0x7f, 0x03]);
+  }
+
   // Motor control - both A and B
   async motorTimeMulti(seconds: number, powerA: number = 100, powerB: number = 100): Promise<void> {
     const time = Math.round(seconds * 1000);
