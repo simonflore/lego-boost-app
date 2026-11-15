@@ -1,4 +1,6 @@
 PODS:
+  - BoostGamepad (1.0.0):
+    - ExpoModulesCore
   - EXConstants (18.0.12):
     - ExpoModulesCore
   - EXJSONUtils (0.15.0)
@@ -2228,6 +2230,7 @@ PODS:
   - Yoga (0.0.0)
 
 DEPENDENCIES:
+  - BoostGamepad (from `../modules/boost-gamepad/ios`)
   - EXConstants (from `../node_modules/expo-constants/ios`)
   - EXJSONUtils (from `../node_modules/expo-json-utils/ios`)
   - EXManifests (from `../node_modules/expo-manifests/ios`)
@@ -2326,6 +2329,8 @@ SPEC REPOS:
     - MultiplatformBleAdapter
 
 EXTERNAL SOURCES:
+  BoostGamepad:
+    :path: "../modules/boost-gamepad/ios"
   EXConstants:
     :path: "../node_modules/expo-constants/ios"
   EXJSONUtils:
@@ -2511,6 +2516,7 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
+  BoostGamepad: a7c70ca967300c0932331e901bd68ebd7130e52f
   EXConstants: 805f35b1b295c542ca6acce836f21a1f9ee104d5
   EXJSONUtils: 1d3e4590438c3ee593684186007028a14b3686cd
   EXManifests: a8d97683e5c7a3b026ffbd58559c64dc655b747b
@@ -2606,4 +2612,4 @@ SPEC CHECKSUMS:
 
 PODFILE CHECKSUM: 732e747a3a6ce39c9ece6d6e668a3e00393f0aa8
 
-COCOAPODS: 1.16.2
+COCOAPODS: 1.17.0

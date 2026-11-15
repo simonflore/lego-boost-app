@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F0141E"/>
+      <stop offset="1" stop-color="#C40009"/>
+    </linearGradient>
+    <linearGradient id="stud" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2E7BE0"/>
+      <stop offset="1" stop-color="#0049A6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background (iOS applies the rounded mask) -->
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+
+  <!-- Ground shadow -->
+  <ellipse cx="512" cy="872" rx="300" ry="34" fill="#000" opacity="0.18"/>
+
+  <!-- Antenna -->
+  <rect x="496" y="118" width="32" height="92" rx="16" fill="#1B1B1B"/>
+  <circle cx="512" cy="112" r="38" fill="#FF6D00"/>
+  <circle cx="500" cy="100" r="11" fill="#fff" opacity="0.5"/>
+
+  <!-- Studs -->
+  <g>
+    <rect x="300" y="196" width="148" height="66" rx="14" fill="url(#stud)"/>
+    <ellipse cx="374" cy="196" rx="74" ry="22" fill="#3D8BF0"/>
+    <rect x="576" y="196" width="148" height="66" rx="14" fill="url(#stud)"/>
+    <ellipse cx="650" cy="196" rx="74" ry="22" fill="#3D8BF0"/>
+  </g>
+
+  <!-- Head brick -->
+  <clipPath id="head"><rect x="212" y="240" width="600" height="560" rx="56"/></clipPath>
+  <rect x="212" y="240" width="600" height="560" rx="56" fill="#0055BF"/>
+  <rect x="212" y="240" width="600" height="40" fill="#2E7BE0" opacity="0.7" clip-path="url(#head)"/>
+
+  <!-- Side "ears" (orange beams) -->
+  <rect x="150" y="410" width="80" height="200" rx="28" fill="#FF6D00"/>
+  <rect x="794" y="410" width="80" height="200" rx="28" fill="#FF6D00"/>
+  <circle cx="190" cy="460" r="16" fill="#C45400"/>
+  <circle cx="190" cy="560" r="16" fill="#C45400"/>
+  <circle cx="834" cy="460" r="16" fill="#C45400"/>
+  <circle cx="834" cy="560" r="16" fill="#C45400"/>
+
+  <!-- Face plate -->
+  <rect x="280" y="320" width="464" height="400" rx="40" fill="#FFFFFF"/>
+
+  <!-- Eyes -->
+  <circle cx="400" cy="470" r="78" fill="#1B1B1B"/>
+  <circle cx="624" cy="470" r="78" fill="#1B1B1B"/>
+  <circle cx="400" cy="470" r="44" fill="#2E7BE0"/>
+  <circle cx="624" cy="470" r="44" fill="#2E7BE0"/>
+  <circle cx="384" cy="452" r="16" fill="#fff"/>
+  <circle cx="608" cy="452" r="16" fill="#fff"/>
+
+  <!-- Mouth grille -->
+  <rect x="392" y="600" width="240" height="64" rx="32" fill="#1B1B1B"/>
+  <rect x="440" y="600" width="12" height="64" fill="#FF6D00"/>
+  <rect x="506" y="600" width="12" height="64" fill="#FF6D00"/>
+  <rect x="572" y="600" width="12" height="64" fill="#FF6D00"/>
+
+  <!-- Chin bolts -->
+  <circle cx="300" cy="756" r="18" fill="#003C88"/>
+  <circle cx="724" cy="756" r="18" fill="#003C88"/>
+</svg>

@@ -12,7 +12,7 @@ export enum PortId {
   B = 0x01,
   C = 0x02,
   D = 0x03,
-  AB = 0x39, // Combined motors A+B
+  AB = 0x10, // Combined motors A+B (virtual; the hub reports the real ID on connect)
   LED = 0x32,
   TILT = 0x3a,
   CURRENT = 0x3b,
@@ -88,6 +88,7 @@ export interface DeviceInfo {
   color: string;
   error: string;
   rssi: number;
+  battery: number | null; // percent, null until the hub reports it
   tilt: TiltInfo;
   ports: {
     A: PortInfo;
@@ -132,6 +133,7 @@ export const DEFAULT_DEVICE_INFO: DeviceInfo = {
   color: '',
   error: '',
   rssi: 0,
+  battery: null,
   tilt: { roll: 0, pitch: 0 },
   ports: {
     A: { action: '', angle: 0 },

@@ -10,6 +10,7 @@ React Native app to control LEGO Boost robots via Bluetooth on iOS and Android.
 - **Motor Control** - Individual power control for ports A, B, C, D
 - **AI Mode** - Autonomous obstacle avoidance
 - **Configuration** - Motor presets and fine-tuning
+- **Gamepad** - Drive with a hardware controller (Google Stadia in Bluetooth mode, MFi, PlayStation, Xbox) via Apple's GameController framework
 
 ## Tech Stack
 
@@ -66,8 +67,11 @@ app/                          # Expo Router screens
     ├── index.tsx             # Connect screen
     ├── control.tsx           # Manual control screen
     ├── motors.tsx            # Motor control screen
+    ├── gamepad.tsx           # Hardware controller screen
     ├── ai.tsx                # AI autonomous mode
     └── config.tsx            # Configuration screen
+modules/
+└── boost-gamepad/            # Local Expo module (Swift) bridging GCController to JS
 src/
 ├── components/
 │   └── LegoComponents.tsx    # Shared UI components
@@ -106,3 +110,23 @@ Commands are sent as byte arrays. See `LegoBoostService.ts` for protocol impleme
 ## License
 
 MIT - LEGO and BOOST are trademarks of The LEGO Company. Use at your own risk.
+
+## Gamepad
+
+1. Pair a PlayStation, Xbox or MFi controller in iOS Settings > Bluetooth.
+2. Port layout matches the M.T.R.4 build: A + B drive, C colour/distance sensor, D tool motor.
+3. Connect to the hub, open the **Gamepad** tab.
+
+| Input | Action |
+|-------|--------|
+| Left stick | Arcade drive (throttle + steer) |
+| R2 / L2 | Analog forward / reverse |
+| D-pad | Full-power drive / turn while held |
+| Right stick ↑↓ | Tool motor on port D (arm / shooter) |
+| A | Fire: short burst on port D |
+| X | Reverse burst |
+| B | Stop everything (hold to brake) |
+| Y | Cycle hub LED |
+| L1 / R1 | Speed cap 40% / 70% / 100% |
+
+The controller only works in a native build (`npm run ios` or EAS), not on web or in Expo Go.

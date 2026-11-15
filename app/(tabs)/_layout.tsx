@@ -1,12 +1,15 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useBoost } from '../../src/context/BoostContext';
-import { View, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { LegoColors } from '../../src/theme/colors';
 import { LegoStatusIndicator } from '../../src/components/LegoComponents';
 
 export default function TabLayout() {
-  const { isConnected } = useBoost();
+  const { isConnected, deviceInfo } = useBoost();
+  const battery = isConnected ? deviceInfo.battery : null;
+  const batteryIcon =
+    battery == null ? 'battery-full' : battery > 60 ? 'battery-full' : battery > 20 ? 'battery-half' : 'battery-dead';
 
   return (
     <Tabs
@@ -38,6 +41,18 @@ export default function TabLayout() {
         },
         headerRight: () => (
           <View style={styles.statusContainer}>
+            {battery != null && (
+              <View style={[styles.battery, battery <= 15 && styles.batteryLow]}>
+                <Ionicons
+                  name={batteryIcon}
+                  size={18}
+                  color={battery <= 15 ? LegoColors.black : LegoColors.white}
+                />
+                <Text style={[styles.batteryText, battery <= 15 && styles.batteryTextLow]}>
+                  {battery}%
+                </Text>
+              </View>
+            )}
             <LegoStatusIndicator connected={isConnected} />
           </View>
         ),
@@ -66,10 +81,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="gamepad"
         options={{
-          title: 'PS4',
-          headerTitle: 'PS4 CONTROLLER',
+          title: 'Gamepad',
+          headerTitle: 'GAMEPAD',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="logo-playstation" size={size} color={color} />
+            <Ionicons name="game-controller" size={size} color={color} />
           ),
         }}
       />
@@ -110,5 +125,28 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   statusContainer: {
     marginRight: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  battery: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  batteryLow: {
+    backgroundColor: LegoColors.warning,
+  },
+  batteryText: {
+    color: LegoColors.white,
+    fontWeight: '800',
+    fontSize: 14,
+    fontVariant: ['tabular-nums'],
+  },
+  batteryTextLow: {
+    color: LegoColors.black,
   },
 });

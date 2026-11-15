@@ -38,6 +38,9 @@ class LegoBoostService {
   private connectionCallbacks: ConnectionCallback[] = [];
   private deviceInfoCallbacks: DeviceInfoCallback[] = [];
   private aiRunning: boolean = false;
+  // Virtual port for synchronised A+B. Firmware 2.x reports it on connect
+  // (usually 0x10); 0x39 was the pre-LWP3 address and is ignored by current hubs.
+  private abPort: number = 0x10;
   private aiInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
@@ -120,8 +123,23 @@ class LegoBoostService {
         return false;
       }
 
+      // After an app restart iOS often keeps the hub's BLE link open, so the hub
+      // stops advertising and a scan never finds it. Reuse that link first.
+      const alreadyConnected = await this.manager.connectedDevices([LEGO_BOOST_SERVICE_UUID]);
+      if (alreadyConnected.length > 0) {
+        console.log('Reusing system-connected hub:', alreadyConnected[0].name);
+        if (await this.attach(alreadyConnected[0])) return true;
+      }
+
       return new Promise((resolve) => {
         console.log('Scanning for LEGO Boost...');
+        let settled = false;
+        const finish = (ok: boolean) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          resolve(ok);
+        };
 
         this.manager.startDeviceScan(
           [LEGO_BOOST_SERVICE_UUID],
@@ -131,80 +149,75 @@ class LegoBoostService {
               console.error('Scan error:', error);
               this._deviceInfo.error = error.message;
               this.notifyDeviceInfoChange();
-              resolve(false);
+              finish(false);
               return;
             }
-
-            if (scannedDevice) {
+            if (scannedDevice && !settled) {
               console.log('Found device:', scannedDevice.name);
               this.manager.stopDeviceScan();
-
-              try {
-                // Connect to device
-                this.device = await scannedDevice.connect();
-                console.log('Connected to device');
-
-                // Discover services and characteristics
-                await this.device.discoverAllServicesAndCharacteristics();
-
-                // Get the characteristic for communication
-                const characteristics = await this.device.characteristicsForService(
-                  LEGO_BOOST_SERVICE_UUID
-                );
-
-                this.characteristic = characteristics.find(
-                  c => c.uuid.toLowerCase() === LEGO_BOOST_CHARACTERISTIC_UUID.toLowerCase()
-                ) || null;
-
-                if (!this.characteristic) {
-                  throw new Error('LEGO Boost characteristic not found');
-                }
-
-                // Set up notifications for incoming data
-                await this.setupNotifications();
-
-                // Monitor disconnection
-                this.device.onDisconnected(() => {
-                  console.log('Device disconnected');
-                  this._deviceInfo.connected = false;
-                  this.device = null;
-                  this.characteristic = null;
-                  this.notifyConnectionChange(false);
-                  this.notifyDeviceInfoChange();
-                });
-
-                this._deviceInfo.connected = true;
-                this._deviceInfo.error = '';
-                this.notifyConnectionChange(true);
-                this.notifyDeviceInfoChange();
-
-                // Activate notifications for sensors
-                await this.activatePortNotifications();
-
-                resolve(true);
-              } catch (connectError: any) {
-                console.error('Connection error:', connectError);
-                this._deviceInfo.error = connectError.message;
-                this.notifyDeviceInfoChange();
-                resolve(false);
-              }
+              finish(await this.attach(scannedDevice));
             }
           }
         );
 
         // Stop scanning after 15 seconds
-        setTimeout(() => {
+        const timeout = setTimeout(() => {
           this.manager.stopDeviceScan();
           if (!this._deviceInfo.connected) {
             this._deviceInfo.error = 'No LEGO Boost hub found. Make sure it is turned on.';
             this.notifyDeviceInfoChange();
-            resolve(false);
           }
+          finish(this._deviceInfo.connected);
         }, 15000);
       });
     } catch (error: any) {
       console.error('Connect error:', error);
       this._deviceInfo.error = error.message;
+      this.notifyDeviceInfoChange();
+      return false;
+    }
+  }
+
+  // Connect (or re-attach) to a hub and set up the LWP3 channel
+  private async attach(device: Device): Promise<boolean> {
+    try {
+      this.device = (await device.isConnected()) ? device : await device.connect();
+      console.log('Connected to device');
+
+      await this.device.discoverAllServicesAndCharacteristics();
+      const characteristics = await this.device.characteristicsForService(
+        LEGO_BOOST_SERVICE_UUID
+      );
+      this.characteristic = characteristics.find(
+        c => c.uuid.toLowerCase() === LEGO_BOOST_CHARACTERISTIC_UUID.toLowerCase()
+      ) || null;
+      if (!this.characteristic) {
+        throw new Error('LEGO Boost characteristic not found');
+      }
+
+      await this.setupNotifications();
+
+      this.device.onDisconnected(() => {
+        console.log('Device disconnected');
+        this._deviceInfo.connected = false;
+        this.device = null;
+        this.characteristic = null;
+        this.notifyConnectionChange(false);
+        this.notifyDeviceInfoChange();
+      });
+
+      this._deviceInfo.connected = true;
+      this._deviceInfo.error = '';
+      this.notifyConnectionChange(true);
+      this.notifyDeviceInfoChange();
+
+      await this.activatePortNotifications();
+      return true;
+    } catch (connectError: any) {
+      console.error('Connection error:', connectError);
+      this.device = null;
+      this.characteristic = null;
+      this._deviceInfo.error = connectError.message;
       this.notifyDeviceInfoChange();
       return false;
     }
@@ -231,6 +244,9 @@ class LegoBoostService {
     await this.write([0x0a, 0x00, 0x41, 0x02, 0x08, 0x01, 0x00, 0x00, 0x00, 0x01]);
     // Activate tilt sensor
     await this.write([0x0a, 0x00, 0x41, 0x3a, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01]);
+    // Battery: hub property 0x06. Enable pushed updates (0x02), then ask once (0x05).
+    await this.write([0x05, 0x00, MessageType.HUB_PROPERTIES, 0x06, 0x02]);
+    await this.write([0x05, 0x00, MessageType.HUB_PROPERTIES, 0x06, 0x05]);
   }
 
   // Handle incoming data from the hub
@@ -243,6 +259,13 @@ class LegoBoostService {
         break;
       case MessageType.HUB_ATTACHED_IO:
         this.handleAttachedIO(data);
+        break;
+      case MessageType.HUB_PROPERTIES:
+        // [len, hub, 0x01, property, 0x06 = update, value...]
+        if (data[3] === 0x06 && data[4] === 0x06 && data.length >= 6) {
+          this._deviceInfo.battery = data[5];
+          this.notifyDeviceInfoChange();
+        }
         break;
       default:
         // Other message types
@@ -289,6 +312,15 @@ class LegoBoostService {
   private handleAttachedIO(data: Buffer): void {
     const portId = data[3];
     const event = data[4]; // 0 = detached, 1 = attached, 2 = attached virtual
+
+    // Attached virtual: [len, hub, 0x04, port, 0x02, typeLo, typeHi, portA, portB]
+    if (event === 0x02 && data.length >= 9) {
+      const members = [data[7], data[8]].sort().join(',');
+      if (members === `${PortId.A},${PortId.B}`) {
+        this.abPort = portId;
+        console.log('Virtual AB port:', portId);
+      }
+    }
     const portKey = this.getPortKey(portId);
 
     if (portKey && this._deviceInfo.ports[portKey]) {
@@ -388,8 +420,17 @@ class LegoBoostService {
   async driveWithPower(powerA: number, powerB: number): Promise<void> {
     const pA = Math.max(-100, Math.min(100, Math.round(powerA)));
     const pB = Math.max(-100, Math.min(100, Math.round(powerB)));
-    // 0x08 = StartSpeed for synchronized dual-port, runs until stopped
-    await this.write([0x0b, 0x00, 0x81, PortId.AB, 0x11, 0x08, pA, pB, 0x64, 0x7f, 0x03]);
+    // 0x08 = StartSpeed(Speed1, Speed2, MaxPower, UseProfile) on the virtual AB port.
+    // Runs until the next command; no accel/decel profile so the stick feels direct.
+    await this.write([0x0a, 0x00, 0x81, this.abPort, 0x11, 0x08, pA, pB, 0x64, 0x00]);
+  }
+
+  // Continuous single-motor control (e.g. port D tool motor); 0 stops it
+  async motorSpeed(port: string, power: number): Promise<void> {
+    const portId = this.getPortId(port);
+    const p = Math.max(-100, Math.min(100, Math.round(power)));
+    // 0x07 = StartSpeed(Speed, MaxPower, UseProfile)
+    await this.write([0x09, 0x00, 0x81, portId, 0x11, 0x07, p, 0x64, 0x00]);
   }
 
   // Motor control - both A and B
@@ -401,7 +442,7 @@ class LegoBoostService {
     const motorPowerB = Math.max(-100, Math.min(100, Math.round(powerB)));
 
     await this.write([
-      0x0d, 0x00, 0x81, PortId.AB, 0x11, 0x0a,
+      0x0d, 0x00, 0x81, this.abPort, 0x11, 0x0a,
       timeLow, timeHigh, motorPowerA, motorPowerB, 0x64, 0x7f, 0x03
     ]);
   }
@@ -439,7 +480,7 @@ class LegoBoostService {
     ];
 
     await this.write([
-      0x0f, 0x00, 0x81, PortId.AB, 0x11, 0x0c,
+      0x0f, 0x00, 0x81, this.abPort, 0x11, 0x0c,
       ...angleBytes, motorPowerA, motorPowerB, 0x64, 0x7f, 0x03
     ]);
   }
@@ -490,7 +531,7 @@ class LegoBoostService {
       B: PortId.B,
       C: PortId.C,
       D: PortId.D,
-      AB: PortId.AB,
+      AB: this.abPort,
       LED: PortId.LED,
     };
     return portMap[port.toUpperCase()] ?? PortId.A;

@@ -2,17 +2,19 @@ import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useBoost } from '../../src/context/BoostContext';
-import { useGamepad } from '../../src/hooks/useGamepad';
+import { useGamepad, SPEED_LEVELS } from '../../src/hooks/useGamepad';
 import { LegoColors, LegoSpacing, LegoBorderRadius, LegoShadow } from '../../src/theme/colors';
 
 const BUTTON_MAP = [
-  { input: 'Left Stick', action: 'Drive + steer (analog)' },
-  { input: 'Cross (✕)', action: 'Drive forward' },
-  { input: 'Square (■)', action: 'Drive backward' },
-  { input: 'Circle (○)', action: 'Stop' },
-  { input: 'Triangle (△)', action: 'Cycle LED color' },
-  { input: 'D-Pad ↑↓', action: 'Drive forward / backward' },
-  { input: 'D-Pad ←→', action: 'Turn left / right' },
+  { input: 'Left stick', action: 'Drive + steer (analog)' },
+  { input: 'R2 / L2', action: 'Throttle forward / reverse' },
+  { input: 'D-pad', action: 'Full-power drive / turn while held' },
+  { input: 'Right stick ↑↓', action: 'Arm / shooter (motor D)' },
+  { input: 'A (✕)', action: 'Fire: short burst on motor D' },
+  { input: 'X (□)', action: 'Reverse burst' },
+  { input: 'B (○)', action: 'Stop everything (hold to brake)' },
+  { input: 'Y (△)', action: 'Cycle LED color' },
+  { input: 'L1 / R1', action: 'Speed cap down / up' },
 ];
 
 function StickIndicator({ x, y, label }: { x: number; y: number; label: string }) {
@@ -40,7 +42,7 @@ function StickIndicator({ x, y, label }: { x: number; y: number; label: string }
 
 export default function GamepadScreen() {
   const { isConnected } = useBoost();
-  const { controllerConnected, leftX, leftY } = useGamepad();
+  const { available, controllerConnected, controllerName, throttle, steer, speedLevel, seen } = useGamepad();
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -54,23 +56,35 @@ export default function GamepadScreen() {
       {/* Controller status */}
       <View style={styles.card}>
         <Ionicons
-          name="logo-playstation"
+          name="game-controller"
           size={56}
           color={controllerConnected ? LegoColors.blue : LegoColors.mediumGray}
         />
         <Text style={[styles.statusText, { color: controllerConnected ? LegoColors.blue : LegoColors.mediumGray }]}>
-          {controllerConnected ? 'PS4 Controller Connected' : 'No Controller Detected'}
+          {controllerConnected ? controllerName || 'Controller connected' : 'No controller detected'}
         </Text>
         {!controllerConnected && (
           <Text style={styles.pairHint}>
-            Hold Share + PS on your controller to pair via Bluetooth Settings
+            {available
+              ? 'Pair your Stadia (Bluetooth mode), PS or Xbox controller in iOS Settings > Bluetooth'
+              : 'Hardware controllers need the iOS development build'}
+          </Text>
+        )}
+        <Text style={styles.pairHint}>
+          {seen.length === 0
+            ? 'iOS reports no game controllers'
+            : 'iOS sees: ' + seen.map(c => `${c.name} (${c.category}, ${c.extended ? 'extended' : c.micro ? 'micro only' : 'no gamepad profile'})`).join(', ')}
+        </Text>
+        {controllerConnected && (
+          <Text style={styles.pairHint}>
+            Speed cap {Math.round(SPEED_LEVELS[speedLevel] * 100)}% (L1 / R1)
           </Text>
         )}
       </View>
 
-      {/* Stick visualiser */}
+      {/* Drive visualiser */}
       <View style={[styles.card, styles.sticksRow]}>
-        <StickIndicator x={leftX} y={leftY} label="Left Stick" />
+        <StickIndicator x={steer} y={throttle} label="Drive" />
       </View>
 
       {/* Button mapping */}

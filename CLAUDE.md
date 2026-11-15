@@ -6,7 +6,7 @@ React Native Expo app for controlling LEGO Boost robots via Bluetooth Low Energy
 
 ## Tech Stack
 
-- **React Native** with Expo SDK 50
+- **React Native** with Expo SDK 54
 - **Expo Router** for file-based navigation
 - **react-native-ble-plx** for Bluetooth LE
 - **TypeScript** throughout
@@ -16,7 +16,9 @@ React Native Expo app for controlling LEGO Boost robots via Bluetooth Low Energy
 - `src/services/LegoBoostService.ts` - Core BLE service implementing LEGO Wireless Protocol 3.0
 - `src/context/BoostContext.tsx` - React context providing boost service to all screens
 - `src/types/lego-boost.ts` - Type definitions for LEGO Boost protocol
-- `app/(tabs)/` - Tab screens (connect, control, motors, ai, config)
+- `app/(tabs)/` - Tab screens (connect, control, motors, gamepad, ai, config)
+- `modules/boost-gamepad/` - Local Expo module (Swift, GCController); autolinked from `modules/`, run `pod install` after changing it
+- `src/hooks/useGamepad.ts` - Polls the pad at 20 Hz and maps it to motor commands
 
 ## Commands
 
