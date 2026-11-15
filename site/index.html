@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Boost Control</title>
-  <meta name="description" content="Drive your LEGO® BOOST robot from an iPhone or iPad with a Stadia, PlayStation or Xbox controller.">
+  <meta name="description" content="Drive your LEGO® BOOST robot with a game controller: an app for iPhone and iPad, and a web version for Android and computers.">
   <meta property="og:title" content="Boost Control">
   <meta property="og:description" content="Drive your LEGO® BOOST robot with a game controller.">
   <meta property="og:image" content="https://boostcontrol.flo.re/icon-512.png">
@@ -22,7 +22,8 @@
         <p class="lead">Drive your LEGO® BOOST robot from an iPhone or iPad, with a real game controller.</p>
         <!-- TESTFLIGHT_LINK: replace href and remove aria-disabled once the public link exists -->
         <a class="cta" id="join" href="#beta" aria-disabled="true">Beta on TestFlight: coming soon</a>
-        <small>Free · iPhone and iPad · iOS 16.4 or later</small>
+        <a class="cta cta-secondary" href="app/">Open the web version</a>
+        <small>Free · iPhone and iPad app · web version for Android and computers</small>
       </div>
     </div>
   </header>
@@ -34,7 +35,7 @@
       <div class="grid">
         <div class="card" style="--accent: var(--red)">
           <h3>Game controllers</h3>
-          <p>Drive with a Stadia, PlayStation, Xbox or MFi controller: sticks to steer, triggers for throttle, buttons for the arm.</p>
+          <p>Drive with most Bluetooth or MFi controllers, like PlayStation and Xbox pads: sticks to steer, triggers for throttle, buttons for the arm.</p>
         </div>
         <div class="card" style="--accent: var(--blue)">
           <h3>Every BOOST build</h3>
@@ -65,7 +66,7 @@
 
     <section>
       <h2>Controller layout</h2>
-      <table>
+      <table class="keys">
         <thead><tr><th>Input</th><th>Action</th></tr></thead>
         <tbody>
           <tr><td>Left stick</td><td>Drive and steer</td></tr>
@@ -80,11 +81,25 @@
       </table>
     </section>
 
+    <section id="web">
+      <h2>On Android or a computer?</h2>
+      <p>Use the <a href="app/">web version</a>: the same controls, in your browser. It needs a browser with Web Bluetooth:</p>
+      <table>
+        <thead><tr><th>Device</th><th>Use</th></tr></thead>
+        <tbody>
+          <tr><td>Android phone or tablet</td><td>Chrome or Edge</td></tr>
+          <tr><td>Windows, macOS, ChromeOS, Linux</td><td>Chrome or Edge</td></tr>
+          <tr><td>iPhone or iPad</td><td>The app (Safari has no Web Bluetooth)</td></tr>
+        </tbody>
+      </table>
+      <p>Controllers work by USB or Bluetooth; press any button once so the browser notices it.</p>
+    </section>
+
     <section id="beta">
-      <h2>Join the beta</h2>
+      <h2>Join the iPhone and iPad beta</h2>
       <ol class="steps">
         <li>Install <a href="https://apps.apple.com/app/testflight/id899247664">TestFlight</a> from the App Store.</li>
-        <li>Open the TestFlight link above on your iPhone or iPad and tap <em>Accept</em>.</li>
+        <li>Open the TestFlight link at the top of this page on your iPhone or iPad and tap <em>Accept</em>.</li>
         <li>Pair your controller in Settings → Bluetooth, turn on the hub and press <em>Connect</em>.</li>
       </ol>
       <p>Found a bug or have an idea? <a href="https://github.com/simonflore/lego-boost-app/issues">Open an issue on GitHub</a>.</p>

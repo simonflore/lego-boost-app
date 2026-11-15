@@ -12,7 +12,8 @@ import { LegoColors, LegoSpacing } from '../../src/theme/colors';
 import { LegoBrickButton, LegoCard } from '../../src/components/LegoComponents';
 
 export default function ConnectScreen() {
-  const { isConnected, isConnecting, deviceInfo, connect, disconnect, model } = useBoost();
+  const { isConnected, isConnecting, deviceInfo, connect, disconnect, model, boost } = useBoost();
+  const unsupported = boost.unsupportedReason;
 
   const handleConnect = async () => {
     if (isConnected) {
@@ -62,6 +63,15 @@ export default function ConnectScreen() {
           />
         )}
       </View>
+
+      {unsupported ? (
+        <LegoCard color={LegoColors.yellow} style={styles.errorCard}>
+          <View style={styles.errorContent}>
+            <Ionicons name="information-circle" size={24} color={LegoColors.darkGray} />
+            <Text style={[styles.errorText, { color: LegoColors.darkGray }]}>{unsupported}</Text>
+          </View>
+        </LegoCard>
+      ) : null}
 
       {/* Error Message */}
       {deviceInfo.error ? (

@@ -1,6 +1,6 @@
-# LEGO Boost Control
+# Boost Control
 
-React Native app to control LEGO Boost robots via Bluetooth on iOS and Android.
+Control LEGO® BOOST robots over Bluetooth: a native app for iPhone and iPad, and a web version for Chrome and Edge on Android and computers. Site: https://boostcontrol.flo.re
 
 ## Features
 
@@ -10,14 +10,14 @@ React Native app to control LEGO Boost robots via Bluetooth on iOS and Android.
 - **Motor Control** - Individual power control for ports A, B, C, D
 - **AI Mode** - Autonomous obstacle avoidance
 - **Robot models** - Presets for all five 17101 builds (Vernie, M.T.R.4, Frankie the Cat, Guitar 4000, AutoBuilder) plus a custom car; settings persist
-- **Gamepad** - Drive with a hardware controller (Google Stadia in Bluetooth mode, MFi, PlayStation, Xbox) via Apple's GameController framework
+- **Gamepad** - Drive with most Bluetooth or MFi game controllers (PlayStation, Xbox, …)
 - **Battery** - Hub battery percentage in the header
 
 ## Tech Stack
 
-- **React Native** 0.88 with Expo SDK 58
+- **React Native** 0.88 with Expo SDK 58 (iOS, Android and web from one codebase)
 - **Expo Router** for file-based navigation
-- **react-native-ble-plx** for Bluetooth LE
+- **react-native-ble-plx** for Bluetooth LE on iOS/Android, **Web Bluetooth** in the browser
 - **TypeScript** throughout
 
 ## Requirements
@@ -56,6 +56,7 @@ npm run android      # Run on Android emulator
 npm run build:dev    # Build iOS development client via EAS
 npm run build:preview # Build iOS preview build via EAS
 npm run lint         # Run ESLint
+npm run build:web    # Export the web version to dist/ (served at /app)
 ```
 
 ## Project Structure
@@ -72,7 +73,8 @@ app/                          # Expo Router screens
     ├── ai.tsx                # AI autonomous mode
     └── config.tsx            # Robot model and fine-tuning
 modules/
-└── boost-gamepad/            # Local Expo module (Swift) bridging GCController to JS
+└── boost-gamepad/            # Controllers: Swift GCController module (iOS), index.web.ts (Gamepad API)
+site/                         # Landing page, privacy policy, nginx + Dockerfile for boostcontrol.flo.re
 src/
 ├── components/
 │   └── LegoComponents.tsx    # Shared UI components
@@ -85,7 +87,8 @@ src/
 ├── models/
 │   └── robotModels.ts        # Port layouts for the five BOOST builds
 ├── services/
-│   └── LegoBoostService.ts   # BLE protocol implementation
+│   ├── LegoBoostService.ts   # LEGO Wireless Protocol (platform independent)
+│   └── transport/            # Bluetooth link: bleTransport.ts (native), bleTransport.web.ts (Web Bluetooth)
 ├── theme/
 │   └── colors.ts             # App color palette
 └── types/
@@ -99,6 +102,20 @@ Communicates with LEGO Boost using LEGO Wireless Protocol 3.0:
 - Characteristic: `00001624-1212-efde-1623-785feabcd123`
 
 Commands are sent as byte arrays. See `LegoBoostService.ts` for protocol implementation.
+
+## Web version and site
+
+`site/Dockerfile` builds the landing page and the web export into one nginx image:
+the page at `/`, the web app at `/app/`. Build it from the repo root:
+
+```bash
+docker build -f site/Dockerfile -t boostcontrol-site .
+```
+
+On Coolify: base directory `/`, Dockerfile location `/site/Dockerfile`, port 80.
+
+Web Bluetooth needs Chrome or Edge (Android, Windows, macOS, Linux, ChromeOS) and HTTPS.
+Safari on iPhone and iPad has no Web Bluetooth, so iOS users need the app.
 
 ## Native projects
 
@@ -127,7 +144,7 @@ MIT - LEGO and BOOST are trademarks of The LEGO Company. Use at your own risk.
 
 ## Gamepad
 
-1. Pair a Stadia (Bluetooth mode), PlayStation, Xbox or MFi controller in iOS Settings > Bluetooth.
+1. Pair a Bluetooth or MFi game controller (PlayStation, Xbox, …) in iOS Settings > Bluetooth.
    If iOS shows it connected but the app lists no controllers, toggle Bluetooth off and on.
 2. Pick your build in **Settings**: it decides whether the pad drives and what motor D does.
 3. Connect to the hub, open the **Gamepad** tab.
@@ -144,6 +161,6 @@ MIT - LEGO and BOOST are trademarks of The LEGO Company. Use at your own risk.
 | Y | Cycle hub LED |
 | L1 / R1 | Speed cap 40% / 70% / 100% |
 
-The controller only works in a native build (`npm run ios` or EAS), not on web or in Expo Go.
+In the web version, controllers connect by USB or Bluetooth and appear after you press a button. Expo Go isn't supported (native Bluetooth module).
 
 Builds that don't drive (Frankie, Guitar 4000, AutoBuilder) ignore the drive inputs; motor D, LED and stop still work.

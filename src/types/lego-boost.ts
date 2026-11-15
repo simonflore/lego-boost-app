@@ -5,10 +5,6 @@
 import type { MotorPort, RobotModelId } from '../models/robotModels';
 import { DEFAULT_MODEL_ID } from '../models/robotModels';
 
-// Hub service and characteristic UUIDs
-export const LEGO_BOOST_SERVICE_UUID = '00001623-1212-efde-1623-785feabcd123';
-export const LEGO_BOOST_CHARACTERISTIC_UUID = '00001624-1212-efde-1623-785feabcd123';
-
 // Port IDs
 export enum PortId {
   A = 0x00,

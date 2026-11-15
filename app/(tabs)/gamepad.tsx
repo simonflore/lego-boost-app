@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useBoost } from '../../src/context/BoostContext';
 import { useGamepad, SPEED_LEVELS } from '../../src/hooks/useGamepad';
@@ -71,15 +71,17 @@ export default function GamepadScreen() {
         </Text>
         {!controllerConnected && (
           <Text style={styles.pairHint}>
-            {available
-              ? 'Pair your Stadia (Bluetooth mode), PS or Xbox controller in iOS Settings > Bluetooth'
-              : 'Hardware controllers need the iOS development build'}
+            {Platform.OS === 'web'
+              ? 'Connect a controller by USB or Bluetooth, then press any button on it so the browser picks it up'
+              : available
+                ? 'Pair a Bluetooth or MFi game controller (PlayStation, Xbox, …) in Settings > Bluetooth'
+                : 'Hardware controllers need the native app build'}
           </Text>
         )}
         <Text style={styles.pairHint}>
           {seen.length === 0
-            ? 'iOS reports no game controllers'
-            : 'iOS sees: ' + seen.map(c => `${c.name} (${c.category}, ${c.extended ? 'extended' : c.micro ? 'micro only' : 'no gamepad profile'})`).join(', ')}
+            ? 'No game controllers detected'
+            : 'Detected: ' + seen.map(c => `${c.name} (${c.category}, ${c.extended ? 'extended' : c.micro ? 'micro only' : 'no gamepad profile'})`).join(', ')}
         </Text>
         {controllerConnected && (
           <Text style={styles.pairHint}>

@@ -48,7 +48,12 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "static"
+      "output": "single",
+      "favicon": "./assets/favicon.png",
+      "name": "Boost Control",
+      "shortName": "Boost Control",
+      "themeColor": "#E3000B",
+      "backgroundColor": "#F6F4EF"
     },
     "plugins": [
       "expo-router",
@@ -64,7 +69,8 @@
       ]
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "baseUrl": "/app"
     }
   }
 }

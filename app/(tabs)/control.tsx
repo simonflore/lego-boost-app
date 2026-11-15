@@ -4,12 +4,12 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useBoost } from '../../src/context/BoostContext';
+import { showAlert } from '../../src/utils/alert';
 import { ControlMode, LedColor } from '../../src/types/lego-boost';
 import { LegoColors, LegoSpacing, LegoBorderRadius } from '../../src/theme/colors';
 import { LegoCard, LegoStudButton, LegoResponsiveContainer } from '../../src/components/LegoComponents';
@@ -38,7 +38,7 @@ export default function ControlScreen() {
 
   const checkConnection = (): boolean => {
     if (!isConnected) {
-      Alert.alert('Not Connected', 'Connect to your BOOST hub first.');
+      showAlert('Not Connected', 'Connect to your BOOST hub first.');
       return false;
     }
     return true;

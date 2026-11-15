@@ -2,9 +2,9 @@
  * LEGO BOOST Move Hub over BLE (LEGO Wireless Protocol 3.0)
  */
 
-import { PermissionsAndroid, Platform } from 'react-native';
-import { BleManager, Characteristic, Device, State, Subscription } from 'react-native-ble-plx';
 import { Buffer } from 'buffer';
+import { connectToHub, unsupportedReason } from './transport/bleTransport';
+import { HubLink, TransportError } from './transport/types';
 import {
   AiState,
   AttachedDevice,
@@ -14,8 +14,6 @@ import {
   ExternalPort,
   IoType,
   LedColor,
-  LEGO_BOOST_CHARACTERISTIC_UUID,
-  LEGO_BOOST_SERVICE_UUID,
   MessageType,
   PortId,
   createDeviceInfo,
@@ -25,10 +23,7 @@ type ConnectionCallback = (connected: boolean) => void;
 type DeviceInfoCallback = (info: DeviceInfo) => void;
 type AiStateCallback = (state: AiState) => void;
 
-const SCAN_TIMEOUT_MS = 15000;
 const NOTIFY_INTERVAL_MS = 100;
-const MOVE_HUB_SYSTEM_TYPE = 0x40;
-const LEGO_COMPANY_ID = 0x0397;
 
 const AI_SPEED = 50;
 const AI_OBSTACLE_CM = 12;
@@ -44,10 +39,7 @@ const COLOR_NAMES = [
 const clampPower = (v: number) => Math.max(-100, Math.min(100, Math.round(v)));
 
 class LegoBoostService {
-  private manager: BleManager;
-  private device: Device | null = null;
-  private characteristic: Characteristic | null = null;
-  private subscriptions: Subscription[] = [];
+  private link: HubLink | null = null;
   private configuration: BoostConfiguration = { ...DEFAULT_CONFIGURATION };
   private _deviceInfo: DeviceInfo = createDeviceInfo();
   private connecting = false;
@@ -66,8 +58,9 @@ class LegoBoostService {
   private aiTimer: ReturnType<typeof setInterval> | null = null;
   private aiUntil = 0;
 
-  constructor() {
-    this.manager = new BleManager();
+  /** Null when this platform can reach a hub at all; otherwise why not. */
+  get unsupportedReason(): string | null {
+    return unsupportedReason();
   }
 
   get deviceInfo(): DeviceInfo {
@@ -147,169 +140,43 @@ class LegoBoostService {
 
   // ------------------------------------------------------------ connecting
 
-  /** Returns an error message, or null when Bluetooth is ready. */
-  private async ensureBluetooth(): Promise<string | null> {
-    if (Platform.OS === 'android') {
-      const perms =
-        Number(Platform.Version) >= 31
-          ? [
-              PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-              PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-            ]
-          : [PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION];
-      const result = await PermissionsAndroid.requestMultiple(perms);
-      if (perms.some(p => result[p] !== PermissionsAndroid.RESULTS.GRANTED)) {
-        return 'Bluetooth permission was denied.';
-      }
-    }
-
-    const state = await this.manager.state();
-    if (state === State.PoweredOn) return null;
-    if (state === State.Unauthorized) {
-      return 'Bluetooth access is off for this app. Turn it on in Settings.';
-    }
-    if (state === State.Unsupported) return 'This device does not support Bluetooth LE.';
-
-    // Unknown / Resetting / PoweredOff: give the radio a moment to come up.
-    const ready = await new Promise<boolean>(resolve => {
-      const timer = setTimeout(() => {
-        sub.remove();
-        resolve(false);
-      }, 5000);
-      const sub = this.manager.onStateChange(newState => {
-        if (newState === State.PoweredOn) {
-          clearTimeout(timer);
-          sub.remove();
-          resolve(true);
-        }
-      }, true);
-    });
-    if (ready) return null;
-    return state === State.PoweredOff ? 'Turn on Bluetooth to connect.' : 'Bluetooth is not ready.';
-  }
-
   async connect(config?: Partial<BoostConfiguration>): Promise<boolean> {
     if (config) this.updateConfiguration(config);
     if (this.isConnected) return true;
     if (this.connecting) return false;
     this.connecting = true;
 
+    // Reset before connecting: the hub announces its ports as soon as the link opens.
+    this._deviceInfo = createDeviceInfo();
+    this.abPort = PortId.AB;
+    this.sensorPort = PortId.C;
+
     try {
-      const bluetoothError = await this.ensureBluetooth();
-      if (bluetoothError) {
-        this.setError(bluetoothError);
-        return false;
-      }
-
-      // After an app restart iOS often keeps the hub's BLE link open, so the hub
-      // stops advertising and a scan never finds it. Reuse that link first.
-      const alreadyConnected = await this.manager.connectedDevices([LEGO_BOOST_SERVICE_UUID]);
-      for (const device of alreadyConnected) {
-        if (await this.attach(device)) return true;
-      }
-
-      return await this.scanAndAttach();
+      // No await before this call: on the web it must run inside the click.
+      this.link = await connectToHub({
+        onData: data => this.handleIncomingData(Buffer.from(data)),
+        onDisconnect: () => this.handleDisconnected(true),
+      });
+      this._deviceInfo.connected = true;
+      this.notifyConnectionChange(true);
+      this.notifyDeviceInfoChange(true);
+      await this.subscribeSensors();
+      return true;
     } catch (error: any) {
-      console.error('Connect error:', error);
-      this.setError(error?.message ?? 'Could not connect.');
+      console.warn('Connect error:', error);
+      this.link = null;
+      this.setError(
+        error instanceof TransportError ? error.message : error?.message ?? 'Could not connect to the hub.'
+      );
       return false;
     } finally {
       this.connecting = false;
     }
   }
 
-  private scanAndAttach(): Promise<boolean> {
-    return new Promise(resolve => {
-      let settled = false;
-
-      const timeout = setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        this.manager.stopDeviceScan();
-        this.setError('No LEGO BOOST hub found. Turn it on and press its green button.');
-        resolve(false);
-      }, SCAN_TIMEOUT_MS);
-
-      this.manager.startDeviceScan([LEGO_BOOST_SERVICE_UUID], { allowDuplicates: false }, (error, device) => {
-        if (settled) return;
-        if (error) {
-          console.error('Scan error:', error);
-          settled = true;
-          clearTimeout(timeout);
-          this.manager.stopDeviceScan();
-          this.setError(error.message);
-          resolve(false);
-          return;
-        }
-        if (!device || !LegoBoostService.isMoveHub(device)) return;
-        settled = true; // claim it before the async attach
-        clearTimeout(timeout);
-        this.manager.stopDeviceScan();
-        this.attach(device).then(resolve);
-      });
-    });
-  }
-
-  /** Other LEGO hubs share the service UUID; the advertisement says which hub it is. */
-  private static isMoveHub(device: Device): boolean {
-    if (!device.manufacturerData) return true;
-    const data = Buffer.from(device.manufacturerData, 'base64');
-    if (data.length < 4 || data.readUInt16LE(0) !== LEGO_COMPANY_ID) return true;
-    return data[3] === MOVE_HUB_SYSTEM_TYPE;
-  }
-
-  /** Connect (or re-attach) to a hub and open the LWP3 channel. */
-  private async attach(device: Device): Promise<boolean> {
-    this.clearSubscriptions();
-    try {
-      const connected = (await device.isConnected()) ? device : await device.connect();
-      await connected.discoverAllServicesAndCharacteristics();
-      const characteristics = await connected.characteristicsForService(LEGO_BOOST_SERVICE_UUID);
-      const characteristic = characteristics.find(
-        c => c.uuid.toLowerCase() === LEGO_BOOST_CHARACTERISTIC_UUID.toLowerCase()
-      );
-      if (!characteristic) throw new Error('This hub does not speak the LEGO protocol.');
-
-      this.device = connected;
-      this.characteristic = characteristic;
-      this.abPort = PortId.AB;
-      this.sensorPort = PortId.C;
-      this._deviceInfo = createDeviceInfo();
-
-      this.subscriptions.push(
-        // Errors here also fire on every disconnect; onDisconnected handles that.
-        characteristic.monitor((error, char) => {
-          if (!error && char?.value) this.handleIncomingData(Buffer.from(char.value, 'base64'));
-        }),
-        connected.onDisconnected(() => this.handleDisconnected(true)),
-      );
-
-      this._deviceInfo.connected = true;
-      this.notifyConnectionChange(true);
-      this.notifyDeviceInfoChange(true);
-
-      await this.subscribeSensors();
-      return true;
-    } catch (error: any) {
-      console.error('Connection error:', error);
-      this.clearSubscriptions();
-      this.device = null;
-      this.characteristic = null;
-      this.setError(error?.message ?? 'Could not connect to the hub.');
-      return false;
-    }
-  }
-
-  private clearSubscriptions(): void {
-    this.subscriptions.forEach(s => s.remove());
-    this.subscriptions = [];
-  }
-
   private handleDisconnected(unexpected: boolean): void {
-    this.clearSubscriptions();
     this.stopAiTimer();
-    this.device = null;
-    this.characteristic = null;
+    this.link = null;
     this._deviceInfo = createDeviceInfo();
     if (unexpected) this._deviceInfo.error = 'The hub disconnected.';
     this.notifyConnectionChange(false);
@@ -317,14 +184,12 @@ class LegoBoostService {
   }
 
   async disconnect(): Promise<void> {
-    const device = this.device;
+    const link = this.link;
     this.handleDisconnected(false);
-    if (device) {
-      try {
-        await device.cancelConnection();
-      } catch (error) {
-        console.warn('Disconnect error:', error);
-      }
+    try {
+      await link?.disconnect();
+    } catch (error) {
+      console.warn('Disconnect error:', error);
     }
   }
 
@@ -420,17 +285,10 @@ class LegoBoostService {
   // ------------------------------------------------------------- outgoing
 
   async write(data: number[]): Promise<void> {
-    const characteristic = this.characteristic;
-    if (!characteristic) return;
-    const payload = Buffer.from(data.map(v => v & 0xff)).toString('base64');
+    const link = this.link;
+    if (!link) return;
     try {
-      // Without-response writes don't queue up behind acknowledgements, which
-      // keeps a 20 Hz gamepad stream responsive.
-      if (characteristic.isWritableWithoutResponse) {
-        await characteristic.writeWithoutResponse(payload);
-      } else {
-        await characteristic.writeWithResponse(payload);
-      }
+      await link.write(Uint8Array.from(data, v => v & 0xff));
     } catch (error) {
       console.warn('Write error:', error);
     }
@@ -580,7 +438,6 @@ class LegoBoostService {
 
   destroy(): void {
     this.disconnect();
-    this.manager.destroy();
   }
 }
 

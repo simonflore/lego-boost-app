@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-React Native Expo app for controlling LEGO Boost robots via Bluetooth Low Energy. Targets iOS and Android with native BLE support.
+Boost Control: Expo app for controlling LEGO BOOST robots over Bluetooth LE. iOS/iPadOS native (TestFlight), plus a web build (Web Bluetooth) for Chrome/Edge.
 
 ## Tech Stack
 
@@ -13,12 +13,14 @@ React Native Expo app for controlling LEGO Boost robots via Bluetooth Low Energy
 
 ## Key Files
 
-- `src/services/LegoBoostService.ts` - Core BLE service implementing LEGO Wireless Protocol 3.0
+- `src/services/LegoBoostService.ts` - LEGO Wireless Protocol 3.0, platform independent
+- `src/services/transport/` - Bluetooth link per platform; Metro picks `bleTransport.web.ts` on web. On web, `connect()` must reach `requestDevice` without an earlier await (user-gesture rule)
+- `modules/boost-gamepad/` - `index.ts` wraps the Swift GCController module, `index.web.ts` the Gamepad API (standard mapping)
+- `site/` - landing page + Dockerfile serving the web export at `/app/` (baseUrl in app.json)
 - `src/context/BoostContext.tsx` - React context providing boost service to all screens
 - `src/types/lego-boost.ts` - Type definitions for LEGO Boost protocol
 - `src/models/robotModels.ts` - Port layouts per BOOST build; drive mapping goes through `toAB()` in the service
 - `app/(tabs)/` - Tab screens (connect, control, motors, gamepad, ai, config)
-- `modules/boost-gamepad/` - Local Expo module (Swift, GCController); autolinked from `modules/`, run `pod install` after changing it
 - `src/hooks/useGamepad.ts` - Polls the pad at 20 Hz and maps it to motor commands
 
 ## Commands
@@ -29,6 +31,8 @@ npm start            # Start Expo dev server
 npm run lint         # ESLint (eslint-config-expo)
 npx tsc --noEmit     # Typecheck
 npx expo prebuild --platform ios --clean   # Regenerate ios/ after app.json changes
+npm run build:web    # Web export to dist/
+docker build -f site/Dockerfile -t boostcontrol-site .   # Site + web app image
 npm run build:dev    # Build iOS development client via EAS
 ```
 

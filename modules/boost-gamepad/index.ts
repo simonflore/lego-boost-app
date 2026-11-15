@@ -1,37 +1,8 @@
 import { EventSubscription, requireOptionalNativeModule } from 'expo-modules-core';
 
-export interface PadState {
-  leftX: number;
-  leftY: number;
-  rightX: number;
-  rightY: number;
-  leftTrigger: number;
-  rightTrigger: number;
-  a: boolean;
-  b: boolean;
-  x: boolean;
-  y: boolean;
-  leftShoulder: boolean;
-  rightShoulder: boolean;
-  dpadUp: boolean;
-  dpadDown: boolean;
-  dpadLeft: boolean;
-  dpadRight: boolean;
-  menu: boolean;
-  options: boolean;
-}
+import type { ControllerInfo, Events, PadState } from './types';
 
-export interface ControllerInfo {
-  name: string;
-  category: string;
-  extended: boolean;
-  micro: boolean;
-}
-
-type Events = {
-  onConnect: (e: { name: string }) => void;
-  onDisconnect: (e: { stillConnected: boolean }) => void;
-};
+export type { ControllerInfo, PadState } from './types';
 
 interface BoostGamepadNative {
   getState(): PadState | null;

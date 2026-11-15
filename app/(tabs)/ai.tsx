@@ -4,11 +4,11 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useBoost } from '../../src/context/BoostContext';
+import { showAlert } from '../../src/utils/alert';
 import type { AiState } from '../../src/types/lego-boost';
 import { LegoColors, LegoSpacing, LegoBorderRadius } from '../../src/theme/colors';
 import { LegoCard, LegoBrickButton, LegoBadge } from '../../src/components/LegoComponents';
@@ -34,11 +34,11 @@ export default function AiScreen() {
 
   const handleToggleAi = () => {
     if (!isConnected) {
-      Alert.alert('Not Connected', 'Connect to your BOOST hub first.');
+      showAlert('Not Connected', 'Connect to your BOOST hub first.');
       return;
     }
     if (!model.drives) {
-      Alert.alert('Not a driving model', `${model.name} doesn't drive. Pick a driving model in Settings.`);
+      showAlert('Not a driving model', `${model.name} doesn't drive. Pick a driving model in Settings.`);
       return;
     }
     if (isRunning) boost.stopAi();

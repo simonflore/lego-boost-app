@@ -85,6 +85,14 @@ a { color: var(--blue); }
 }
 .cta:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(0, 0, 0, 0.18); }
 .cta[aria-disabled="true"] { opacity: 0.85; cursor: default; }
+.cta-secondary {
+  background: transparent;
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: none;
+  margin-left: 8px;
+}
+.cta-secondary:active { transform: translateY(1px); box-shadow: none; }
 .hero small { display: block; margin-top: 12px; opacity: 0.85; }
 
 /* Studs along the hero edge */
@@ -169,5 +177,6 @@ footer nav { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 10px; }
   .hero .wrap { grid-template-columns: 1fr; justify-items: center; gap: 20px; }
   .hero img { width: 116px; height: 116px; border-radius: 27px; }
   .hero p.lead { margin-left: auto; margin-right: auto; }
-  th:nth-child(1), td:nth-child(1) { white-space: nowrap; }
+  .cta-secondary { margin: 10px 0 0; }
+  table.keys td:nth-child(1) { white-space: nowrap; }
 }

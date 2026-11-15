@@ -24,7 +24,7 @@ export interface GamepadState {
 const dz = (v: number) => (Math.abs(v) < DEADZONE ? 0 : v);
 
 /**
- * Drives the Boost from a hardware controller (Stadia, MFi, DualShock, Xbox).
+ * Drives the Boost from a hardware controller (MFi, PlayStation, Xbox, …).
  *
  * - Left stick: arcade drive (Y = throttle, X = steer)
  * - R2 / L2: analog forward / reverse (whichever beats the stick)
