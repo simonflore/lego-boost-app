@@ -1,9 +1,18 @@
+import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useBoost } from '../../src/context/BoostContext';
 import { View, Text, StyleSheet } from 'react-native';
 import { LegoColors } from '../../src/theme/colors';
 import { LegoStatusIndicator } from '../../src/components/LegoComponents';
+
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
+// Tab bar colours can be null in the new navigation types; Ionicons wants undefined.
+const tabIcon = (name: IconName) =>
+  function TabIcon({ color, size }: { color: unknown; size: number }) {
+    return <Ionicons name={name} size={size} color={(color as string | null) ?? undefined} />;
+  };
 
 export default function TabLayout() {
   const { isConnected, deviceInfo } = useBoost();
@@ -63,9 +72,7 @@ export default function TabLayout() {
         options={{
           title: 'Connect',
           headerTitle: 'LEGO BOOST',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="bluetooth" size={size} color={color} />
-          ),
+          tabBarIcon: tabIcon('bluetooth'),
         }}
       />
       <Tabs.Screen
@@ -73,9 +80,7 @@ export default function TabLayout() {
         options={{
           title: 'Control',
           headerTitle: 'CONTROL',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="game-controller" size={size} color={color} />
-          ),
+          tabBarIcon: tabIcon('game-controller'),
         }}
       />
       <Tabs.Screen
@@ -83,9 +88,7 @@ export default function TabLayout() {
         options={{
           title: 'Gamepad',
           headerTitle: 'GAMEPAD',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="game-controller" size={size} color={color} />
-          ),
+          tabBarIcon: tabIcon('game-controller'),
         }}
       />
       <Tabs.Screen
@@ -93,9 +96,7 @@ export default function TabLayout() {
         options={{
           title: 'Motors',
           headerTitle: 'MOTORS',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="cog" size={size} color={color} />
-          ),
+          tabBarIcon: tabIcon('cog'),
         }}
       />
       <Tabs.Screen
@@ -103,9 +104,7 @@ export default function TabLayout() {
         options={{
           title: 'AI',
           headerTitle: 'AI MODE',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="flash" size={size} color={color} />
-          ),
+          tabBarIcon: tabIcon('flash'),
         }}
       />
       <Tabs.Screen
@@ -113,9 +112,7 @@ export default function TabLayout() {
         options={{
           title: 'Config',
           headerTitle: 'SETTINGS',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings" size={size} color={color} />
-          ),
+          tabBarIcon: tabIcon('settings'),
         }}
       />
     </Tabs>

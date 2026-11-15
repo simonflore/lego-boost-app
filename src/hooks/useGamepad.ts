@@ -54,7 +54,8 @@ export function mixDrive(pad: PadState, cap: number): { throttle: number; steer:
 }
 
 export function useGamepad(): GamepadState {
-  const { boost, isConnected } = useBoost();
+  const { boost, isConnected, model } = useBoost();
+  const drives = model.drives;
   const [controllerName, setControllerName] = useState<string | null>(
     () => BoostGamepad.getControllerName(),
   );
@@ -110,7 +111,11 @@ export function useGamepad(): GamepadState {
         setSpeedLevel(speedRef.current);
       }
 
-      const { throttle: t, steer: s, a, b } = mixDrive(pad, SPEED_LEVELS[speedRef.current]);
+      const mixed = mixDrive(pad, SPEED_LEVELS[speedRef.current]);
+      const { throttle: t, steer: s } = mixed;
+      // Static builds (Frankie, Guitar, AutoBuilder) never drive A+B from the pad.
+      const a = drives ? mixed.a : 0;
+      const b = drives ? mixed.b : 0;
       setThrottle(t);
       setSteer(s);
 
@@ -143,7 +148,7 @@ export function useGamepad(): GamepadState {
       } else if (pressed('a')) {
         boost.motorTime(TOOL_PORT, FIRE_SECONDS, 100);
       }
-      if (pressed('x')) boost.drive(-1);
+      if (drives && pressed('x')) boost.drive(-1);
 
       const changed =
         Math.abs(a - lastPower.current.a) >= CHANGE_THRESHOLD ||
@@ -158,7 +163,7 @@ export function useGamepad(): GamepadState {
     }, POLL_MS);
 
     return () => clearInterval(id);
-  }, [isConnected, boost]);
+  }, [isConnected, boost, drives]);
 
   return {
     available: BoostGamepad.isAvailable,

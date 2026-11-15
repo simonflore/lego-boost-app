@@ -1,8 +1,11 @@
 /**
- * LEGO Boost Hub BLE Protocol Types
+ * LEGO Wireless Protocol 3.0 types for the BOOST Move Hub
  */
 
-// LEGO Boost Hub Service and Characteristic UUIDs
+import type { MotorPort, RobotModelId } from '../models/robotModels';
+import { DEFAULT_MODEL_ID } from '../models/robotModels';
+
+// Hub service and characteristic UUIDs
 export const LEGO_BOOST_SERVICE_UUID = '00001623-1212-efde-1623-785feabcd123';
 export const LEGO_BOOST_CHARACTERISTIC_UUID = '00001624-1212-efde-1623-785feabcd123';
 
@@ -12,14 +15,14 @@ export enum PortId {
   B = 0x01,
   C = 0x02,
   D = 0x03,
-  AB = 0x10, // Combined motors A+B (virtual; the hub reports the real ID on connect)
+  AB = 0x10, // Virtual A+B port; the hub reports the real ID on connect
   LED = 0x32,
   TILT = 0x3a,
   CURRENT = 0x3b,
   VOLTAGE = 0x3c,
 }
 
-// Message Types
+// Message types
 export enum MessageType {
   HUB_PROPERTIES = 0x01,
   HUB_ACTIONS = 0x02,
@@ -34,22 +37,15 @@ export enum MessageType {
   PORT_OUTPUT_FEEDBACK = 0x82,
 }
 
-// Motor Subcommands
-export enum MotorSubCommand {
-  START_POWER = 0x01,
-  START_POWER_SYNC = 0x02,
-  SET_ACC_TIME = 0x05,
-  SET_DEC_TIME = 0x06,
-  START_SPEED = 0x07,
-  START_SPEED_SYNC = 0x08,
-  START_SPEED_FOR_DEGREES = 0x0b,
-  START_SPEED_FOR_DEGREES_SYNC = 0x0c,
-  GOTO_ABSOLUTE_POSITION = 0x0d,
-  GOTO_ABSOLUTE_POSITION_SYNC = 0x0e,
-  PRESET_ENCODER = 0x14,
+// Device type IDs reported in Hub Attached I/O messages
+export enum IoType {
+  COLOR_DISTANCE_SENSOR = 0x25,
+  EXTERNAL_MOTOR = 0x26,
+  INTERNAL_MOTOR = 0x27,
+  INTERNAL_TILT = 0x28,
 }
 
-// LED Colors
+// Hub LED colours
 export enum LedColor {
   OFF = 0,
   PINK = 1,
@@ -64,18 +60,11 @@ export enum LedColor {
   WHITE = 10,
 }
 
-// Control State
-export type ControlState = 'Turn' | 'Drive' | 'Stop' | 'Back' | 'Manual' | 'Seek';
+export type AiState = 'Stopped' | 'Drive' | 'Back' | 'Turn';
 
-// Motor type
-export type Motor = 'A' | 'B';
-export type PortName = 'A' | 'B' | 'AB' | 'C' | 'D' | 'LED';
+export type ExternalPort = 'A' | 'B' | 'C' | 'D';
 
-// Device Information
-export interface PortInfo {
-  action: string;
-  angle: number;
-}
+export type AttachedDevice = 'motor' | 'sensor' | null;
 
 export interface TiltInfo {
   roll: number;
@@ -84,73 +73,49 @@ export interface TiltInfo {
 
 export interface DeviceInfo {
   connected: boolean;
-  distance: number;
+  /** Distance to the nearest object in cm, null without a sensor reading */
+  distance: number | null;
   color: string;
   error: string;
-  rssi: number;
-  battery: number | null; // percent, null until the hub reports it
+  /** Percent, null until the hub reports it */
+  battery: number | null;
   tilt: TiltInfo;
-  ports: {
-    A: PortInfo;
-    B: PortInfo;
-    AB: PortInfo;
-    C: PortInfo;
-    D: PortInfo;
-    LED: PortInfo;
-  };
+  /** What the hub reports on each port */
+  attached: Record<ExternalPort, AttachedDevice>;
 }
 
-// Control Data
-export interface ControlData {
-  input: string;
-  speed: number;
-  turnAngle: number;
-  state?: ControlState;
-  motorA?: number;
-  motorB?: number;
-}
-
-// Configuration
 export interface BoostConfiguration {
-  leftMotor?: Motor;
-  rightMotor?: Motor;
-  distanceModifier?: number;
-  turnModifier?: number;
-  driveFinetune?: number;
-  turnFinetune?: number;
+  modelId: RobotModelId;
+  leftMotor: MotorPort;
+  rightMotor: MotorPort;
+  invertDrive: boolean;
+  driveFinetune: number;
+  turnFinetune: number;
 }
 
-// Control mode
 export enum ControlMode {
   Click = 0,
   Arcade = 1,
 }
 
-// Default Device Info
-export const DEFAULT_DEVICE_INFO: DeviceInfo = {
-  connected: false,
-  distance: 0,
-  color: '',
-  error: '',
-  rssi: 0,
-  battery: null,
-  tilt: { roll: 0, pitch: 0 },
-  ports: {
-    A: { action: '', angle: 0 },
-    B: { action: '', angle: 0 },
-    AB: { action: '', angle: 0 },
-    C: { action: '', angle: 0 },
-    D: { action: '', angle: 0 },
-    LED: { action: '', angle: 0 },
-  },
-};
+/** A fresh object every call: callers mutate it. */
+export function createDeviceInfo(): DeviceInfo {
+  return {
+    connected: false,
+    distance: null,
+    color: '',
+    error: '',
+    battery: null,
+    tilt: { roll: 0, pitch: 0 },
+    attached: { A: null, B: null, C: null, D: null },
+  };
+}
 
-// Default Configuration
 export const DEFAULT_CONFIGURATION: BoostConfiguration = {
+  modelId: DEFAULT_MODEL_ID,
   leftMotor: 'A',
   rightMotor: 'B',
-  distanceModifier: 1,
-  turnModifier: 1,
+  invertDrive: false,
   driveFinetune: 1,
   turnFinetune: 1,
 };

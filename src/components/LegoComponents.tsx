@@ -11,7 +11,6 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withTiming,
-  interpolate,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { LegoColors, LegoBorderRadius, LegoShadow, LegoSpacing } from '../theme/colors';
@@ -62,14 +61,14 @@ export function LegoBrickButton({
   }));
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.95, { damping: 15, stiffness: 400 });
-    translateY.value = withSpring(2, { damping: 15, stiffness: 400 });
+    scale.set(withSpring(0.95, { damping: 15, stiffness: 400 }));
+    translateY.set(withSpring(2, { damping: 15, stiffness: 400 }));
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15, stiffness: 400 });
-    translateY.value = withSpring(0, { damping: 15, stiffness: 400 });
+    scale.set(withSpring(1, { damping: 15, stiffness: 400 }));
+    translateY.set(withSpring(0, { damping: 15, stiffness: 400 }));
   };
 
   return (
@@ -112,13 +111,13 @@ export function LegoCard({ children, style, color, animated = true }: LegoCardPr
 
   React.useEffect(() => {
     if (animated) {
-      opacity.value = withTiming(1, { duration: 400 });
-      translateY.value = withSpring(0, { damping: 15, stiffness: 100 });
+      opacity.set(withTiming(1, { duration: 400 }));
+      translateY.set(withSpring(0, { damping: 15, stiffness: 100 }));
     } else {
-      opacity.value = 1;
-      translateY.value = 0;
+      opacity.set(1);
+      translateY.set(0);
     }
-  }, []);
+  }, [animated, opacity, translateY]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -154,7 +153,9 @@ export function LegoHeader({ title, subtitle, color = LegoColors.red }: LegoHead
 }
 
 interface LegoStudButtonProps {
-  onPress: () => void;
+  onPress?: () => void;
+  /** Fires on touch down: use for hold-to-drive controls. */
+  onPressIn?: () => void;
   onPressOut?: () => void;
   color?: string;
   size?: number;
@@ -165,6 +166,7 @@ interface LegoStudButtonProps {
 
 export function LegoStudButton({
   onPress,
+  onPressIn,
   onPressOut,
   color = LegoColors.blue,
   size = 70,
@@ -184,14 +186,15 @@ export function LegoStudButton({
   }));
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.9, { damping: 15, stiffness: 400 });
-    innerScale.value = withSpring(0.85, { damping: 15, stiffness: 400 });
+    scale.set(withSpring(0.9, { damping: 15, stiffness: 400 }));
+    innerScale.set(withSpring(0.85, { damping: 15, stiffness: 400 }));
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    onPressIn?.();
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15, stiffness: 400 });
-    innerScale.value = withSpring(1, { damping: 15, stiffness: 400 });
+    scale.set(withSpring(1, { damping: 15, stiffness: 400 }));
+    innerScale.set(withSpring(1, { damping: 15, stiffness: 400 }));
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPressOut?.();
   };
@@ -242,9 +245,9 @@ export function LegoBadge({ color, label, icon }: LegoBadgeProps) {
   const opacity = useSharedValue(0);
 
   React.useEffect(() => {
-    scale.value = withSpring(1, { damping: 12, stiffness: 200 });
-    opacity.value = withTiming(1, { duration: 300 });
-  }, [color, label]);
+    scale.set(withSpring(1, { damping: 12, stiffness: 200 }));
+    opacity.set(withTiming(1, { duration: 300 }));
+  }, [color, label, scale, opacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -266,20 +269,22 @@ interface LegoStatusIndicatorProps {
 export function LegoStatusIndicator({ connected }: LegoStatusIndicatorProps) {
   const scale = useSharedValue(1);
 
+  const previous = React.useRef(connected);
+
   React.useEffect(() => {
-    // Pulse animation when connected
+    // Only react to a real change: this indicator mounts in every tab header,
+    // and buzzing on each mount felt like an error on launch.
+    if (previous.current === connected) return;
+    previous.current = connected;
     if (connected) {
-      const pulse = () => {
-        scale.value = withSpring(1.2, { damping: 10 }, () => {
-          scale.value = withSpring(1, { damping: 10 });
-        });
-      };
-      pulse();
+      scale.set(withSpring(1.2, { damping: 10 }, () => {
+        scale.set(withSpring(1, { damping: 10 }));
+      }));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     }
-  }, [connected]);
+  }, [connected, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],

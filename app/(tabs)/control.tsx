@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
-  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -31,7 +30,9 @@ const LED_COLORS = [
 ];
 
 export default function ControlScreen() {
-  const { isConnected, boost, controlMode, setControlMode } = useBoost();
+  const { isConnected, boost, controlMode, setControlMode, model } = useBoost();
+  const canDrive = isConnected && model.drives;
+  const arcade = controlMode === ControlMode.Arcade;
   const [activeLed, setActiveLed] = useState<number>(LedColor.OFF);
   const { isTablet, studButtonSize, contentMaxWidth } = useDeviceType();
 
@@ -43,36 +44,33 @@ export default function ControlScreen() {
     return true;
   };
 
-  const handleDrive = async (direction: number) => {
+  // Click: tap for a short timed burst. Arcade: drive while held, stop on release.
+  const handleDrive = (direction: number) => {
     if (!checkConnection()) return;
-    if (controlMode === ControlMode.Click) {
-      await boost.drive(direction);
-    } else {
-      await boost.driveToDirection(direction);
-    }
+    if (arcade) boost.driveWithPower(direction * 100, direction * 100);
+    else boost.drive(direction);
   };
 
-  const handleTurn = async (direction: number) => {
+  const handleTurn = (direction: number) => {
     if (!checkConnection()) return;
-    await boost.turn(direction);
+    if (arcade) boost.driveWithPower(direction * 70, -direction * 70);
+    else boost.turn(direction);
   };
 
-  const handleStop = async () => {
+  const handleStop = () => {
     if (!checkConnection()) return;
-    await boost.stop();
+    boost.stop();
   };
+
+  // In arcade mode the press-in starts the motors, so the press-out must stop them.
+  const holdProps = (start: () => void) =>
+    arcade ? { onPressIn: start, onPressOut: handleStop } : { onPress: start };
 
   const handleLedChange = async (color: number) => {
     if (!checkConnection()) return;
     Haptics.selectionAsync();
     setActiveLed(color);
     await boost.led(color);
-  };
-
-  const toggleControlMode = () => {
-    setControlMode(
-      controlMode === ControlMode.Click ? ControlMode.Arcade : ControlMode.Click
-    );
   };
 
   return (
@@ -82,6 +80,12 @@ export default function ControlScreen() {
           <View style={styles.warningBanner}>
             <Ionicons name="warning" size={20} color={LegoColors.black} />
             <Text style={styles.warningText}>CONNECT TO LEGO BOOST FIRST</Text>
+          </View>
+        )}
+        {isConnected && !model.drives && (
+          <View style={styles.warningBanner}>
+            <Ionicons name="information-circle" size={20} color={LegoColors.black} />
+            <Text style={styles.warningText}>{model.name.toUpperCase()} DOESN’T DRIVE: USE THE MOTORS TAB</Text>
           </View>
         )}
 
@@ -121,11 +125,10 @@ export default function ControlScreen() {
           {/* Up button */}
           <View style={styles.dpadRow}>
             <LegoStudButton
-              onPress={() => handleDrive(1)}
-              onPressOut={controlMode === ControlMode.Arcade ? handleStop : undefined}
+              {...holdProps(() => handleDrive(1))}
               color={LegoColors.blue}
               size={studButtonSize}
-              disabled={!isConnected}
+              disabled={!canDrive}
             >
               <Ionicons name="arrow-up" size={isTablet ? 36 : 28} color={LegoColors.white} />
             </LegoStudButton>
@@ -134,10 +137,10 @@ export default function ControlScreen() {
           {/* Left, Stop, Right buttons */}
           <View style={styles.dpadRow}>
             <LegoStudButton
-              onPress={() => handleTurn(-1)}
+              {...holdProps(() => handleTurn(-1))}
               color={LegoColors.blue}
               size={studButtonSize}
-              disabled={!isConnected}
+              disabled={!canDrive}
             >
               <Ionicons name="arrow-back" size={isTablet ? 36 : 28} color={LegoColors.white} />
             </LegoStudButton>
@@ -146,16 +149,16 @@ export default function ControlScreen() {
               onPress={handleStop}
               color={LegoColors.red}
               size={studButtonSize}
-              disabled={!isConnected}
+              disabled={!canDrive}
             >
               <Ionicons name="stop" size={isTablet ? 36 : 28} color={LegoColors.white} />
             </LegoStudButton>
 
             <LegoStudButton
-              onPress={() => handleTurn(1)}
+              {...holdProps(() => handleTurn(1))}
               color={LegoColors.blue}
               size={studButtonSize}
-              disabled={!isConnected}
+              disabled={!canDrive}
             >
               <Ionicons name="arrow-forward" size={isTablet ? 36 : 28} color={LegoColors.white} />
             </LegoStudButton>
@@ -164,11 +167,10 @@ export default function ControlScreen() {
           {/* Down button */}
           <View style={styles.dpadRow}>
             <LegoStudButton
-              onPress={() => handleDrive(-1)}
-              onPressOut={controlMode === ControlMode.Arcade ? handleStop : undefined}
+              {...holdProps(() => handleDrive(-1))}
               color={LegoColors.blue}
               size={studButtonSize}
-              disabled={!isConnected}
+              disabled={!canDrive}
             >
               <Ionicons name="arrow-down" size={isTablet ? 36 : 28} color={LegoColors.white} />
             </LegoStudButton>

@@ -14,8 +14,6 @@ public class BoostGamepadModule: Module {
   private var cachedList: [[String: Any]] = []
   private var observers: [NSObjectProtocol] = []
   private var timer: Timer?
-  private var lastLoggedCount = -1
-  private var loggedJsCall = false
 
   public func definition() -> ModuleDefinition {
     Name("BoostGamepad")
@@ -23,7 +21,6 @@ public class BoostGamepadModule: Module {
     Events("onConnect", "onDisconnect")
 
     OnCreate {
-      Self.log("OnCreate")
       DispatchQueue.main.async { [weak self] in self?.startOnMain() }
     }
 
@@ -37,7 +34,6 @@ public class BoostGamepadModule: Module {
     }
 
     Function("listControllers") { () -> [[String: Any]] in
-      if !self.loggedJsCall { self.loggedJsCall = true; Self.log("JS called listControllers") }
       self.lock.lock(); defer { self.lock.unlock() }
       return self.cachedList
     }
@@ -52,13 +48,11 @@ public class BoostGamepadModule: Module {
   // MARK: - Main thread
 
   private func startOnMain() {
-    Self.log("startOnMain: controllers=\(GCController.controllers().count)")
     let center = NotificationCenter.default
     observers.append(center.addObserver(
       forName: .GCControllerDidConnect, object: nil, queue: .main
     ) { [weak self] note in
       guard let self else { return }
-      Self.log("didConnect: \(String(describing: note.object))")
       self.refreshOnMain()
       let name = (note.object as? GCController).map(Self.displayName) ?? "Controller"
       self.sendEvent("onConnect", ["name": name])
@@ -67,7 +61,6 @@ public class BoostGamepadModule: Module {
       forName: .GCControllerDidDisconnect, object: nil, queue: .main
     ) { [weak self] _ in
       guard let self else { return }
-      Self.log("didDisconnect")
       self.refreshOnMain()
       self.sendEvent("onDisconnect", ["stillConnected": self.cachedStateIsSet()])
     })
@@ -107,10 +100,6 @@ public class BoostGamepadModule: Module {
     let state = active?.extendedGamepad.map(Self.snapshot)
     let name = active.map(Self.displayName)
 
-    if controllers.count != lastLoggedCount {
-      lastLoggedCount = controllers.count
-      Self.log("controllers=\(controllers.count) current=\(String(describing: GCController.current?.vendorName)) list=\(list)")
-    }
 
     lock.lock()
     cachedList = list
@@ -126,10 +115,6 @@ public class BoostGamepadModule: Module {
 
   // MARK: - Helpers
 
-  static func log(_ message: String) {
-    print("[BoostGamepad] \(message)")
-    NSLog("[BoostGamepad] %@", message)
-  }
 
   private static func snapshot(_ pad: GCExtendedGamepad) -> [String: Any] {
     [

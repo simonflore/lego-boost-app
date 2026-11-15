@@ -8,11 +8,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useBoost } from '../../src/context/BoostContext';
-import { LegoColors, LegoSpacing, LegoBorderRadius } from '../../src/theme/colors';
-import { LegoBrickButton, LegoCard, LegoHeader } from '../../src/components/LegoComponents';
+import { LegoColors, LegoSpacing } from '../../src/theme/colors';
+import { LegoBrickButton, LegoCard } from '../../src/components/LegoComponents';
 
 export default function ConnectScreen() {
-  const { isConnected, isConnecting, deviceInfo, connect, disconnect } = useBoost();
+  const { isConnected, isConnecting, deviceInfo, connect, disconnect, model } = useBoost();
 
   const handleConnect = async () => {
     if (isConnected) {
@@ -84,7 +84,7 @@ export default function ConnectScreen() {
                 <Ionicons name="resize" size={20} color={LegoColors.white} />
               </View>
               <Text style={styles.infoLabel}>Distance</Text>
-              <Text style={styles.infoValue}>{deviceInfo.distance} cm</Text>
+              <Text style={styles.infoValue}>{deviceInfo.distance != null ? `${deviceInfo.distance} cm` : 'N/A'}</Text>
             </View>
 
             <View style={styles.infoItem}>
@@ -114,12 +114,12 @@ export default function ConnectScreen() {
 
           <View style={styles.motorInfo}>
             <View style={styles.motorRow}>
-              <Text style={styles.motorLabel}>Motor A</Text>
-              <Text style={styles.motorValue}>{deviceInfo.ports.A.angle}°</Text>
+              <Text style={styles.motorLabel}>Battery</Text>
+              <Text style={styles.motorValue}>{deviceInfo.battery != null ? `${deviceInfo.battery}%` : '…'}</Text>
             </View>
             <View style={styles.motorRow}>
-              <Text style={styles.motorLabel}>Motor B</Text>
-              <Text style={styles.motorValue}>{deviceInfo.ports.B.angle}°</Text>
+              <Text style={styles.motorLabel}>Model</Text>
+              <Text style={styles.motorValue}>{model.name}</Text>
             </View>
           </View>
         </LegoCard>
@@ -131,11 +131,11 @@ export default function ConnectScreen() {
         <View style={styles.stepList}>
           <View style={styles.step}>
             <View style={styles.stepNumber}><Text style={styles.stepNumberText}>1</Text></View>
-            <Text style={styles.stepText}>Turn on your LEGO Boost Move Hub</Text>
+            <Text style={styles.stepText}>Turn on your LEGO Boost Move Hub (green button, light blinks)</Text>
           </View>
           <View style={styles.step}>
             <View style={styles.stepNumber}><Text style={styles.stepNumberText}>2</Text></View>
-            <Text style={styles.stepText}>Enable Bluetooth on your device</Text>
+            <Text style={styles.stepText}>Pick your build in Settings</Text>
           </View>
           <View style={styles.step}>
             <View style={styles.stepNumber}><Text style={styles.stepNumberText}>3</Text></View>

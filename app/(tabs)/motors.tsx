@@ -1,25 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  Alert,
   ScrollView,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
+import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useBoost } from '../../src/context/BoostContext';
+import type { ExternalPort } from '../../src/types/lego-boost';
 import { LegoColors, LegoSpacing, LegoBorderRadius } from '../../src/theme/colors';
-import { LegoCard } from '../../src/components/LegoComponents';
+import { LegoCard, LegoBrickButton } from '../../src/components/LegoComponents';
 
-interface MotorState {
-  A: number;
-  B: number;
-  C: number;
-  D: number;
-}
+type MotorState = Record<ExternalPort, number>;
 
-const MOTOR_COLORS: Record<keyof MotorState, string> = {
+const PORTS: ExternalPort[] = ['A', 'B', 'C', 'D'];
+const STOPPED: MotorState = { A: 0, B: 0, C: 0, D: 0 };
+
+const MOTOR_COLORS: Record<ExternalPort, string> = {
   A: LegoColors.blue,
   B: LegoColors.green,
   C: LegoColors.orange,
@@ -27,91 +26,69 @@ const MOTOR_COLORS: Record<keyof MotorState, string> = {
 };
 
 export default function MotorsScreen() {
-  const { isConnected, boost, deviceInfo } = useBoost();
-  const [motorPower, setMotorPower] = useState<MotorState>({
-    A: 0,
-    B: 0,
-    C: 0,
-    D: 0,
-  });
+  const { isConnected, boost, deviceInfo, model } = useBoost();
+  const [motorPower, setMotorPower] = useState<MotorState>(STOPPED);
 
-  useEffect(() => {
-    return () => {
-      if (isConnected) {
-        boost.stop();
-      }
-    };
-  }, [isConnected]);
+  const stopAll = useCallback(() => {
+    setMotorPower(STOPPED);
+    if (boost.isConnected) boost.stopAll();
+  }, [boost]);
 
-  const handleMotorChange = async (port: keyof MotorState, value: number) => {
-    if (!isConnected) {
-      Alert.alert('Not Connected', 'Please connect to LEGO Boost first.');
-      return;
-    }
+  // Leaving the tab stops every motor, so nothing keeps spinning out of sight.
+  useFocusEffect(useCallback(() => stopAll, [stopAll]));
 
-    setMotorPower((prev) => ({ ...prev, [port]: value }));
-
-    if (value !== 0) {
-      await boost.motorTime(port, 10, value);
-    } else {
-      await boost.motorTime(port, 0, 0);
-    }
+  const handleMotorChange = (port: ExternalPort, value: number) => {
+    if (value === motorPower[port]) return;
+    setMotorPower(prev => ({ ...prev, [port]: value }));
+    boost.motorSpeed(port, value);
   };
 
-  const handleSlidingComplete = async (port: keyof MotorState, value: number) => {
-    if (value === 0 && isConnected) {
-      await boost.motorTime(port, 0, 0);
-    }
+  const renderMotorSlider = (port: ExternalPort) => {
+    const isSensor = deviceInfo.attached[port] === 'sensor';
+    const disabled = !isConnected || isSensor;
+    return (
+      <LegoCard color={MOTOR_COLORS[port]} style={styles.motorCard} key={port}>
+        <View style={styles.motorHeader}>
+          <View style={styles.motorTitleRow}>
+            <View style={[styles.motorBadge, { backgroundColor: MOTOR_COLORS[port] }]}>
+              <Text style={styles.motorBadgeText}>{port}</Text>
+            </View>
+            <View style={styles.motorTitleText}>
+              <Text style={styles.motorLabel}>Port {port}</Text>
+              <Text style={styles.motorDescription}>
+                {isSensor ? 'Colour & distance sensor (no motor)' : model.ports[port]}
+              </Text>
+            </View>
+          </View>
+          <Text style={[styles.motorValue, { color: MOTOR_COLORS[port] }]}>
+            {motorPower[port]}%
+          </Text>
+        </View>
+
+        <View style={[styles.sliderContainer, isSensor && styles.sliderDisabled]}>
+          <View style={styles.sliderTrack}>
+            <Slider
+              style={styles.slider}
+              minimumValue={-100}
+              maximumValue={100}
+              step={5}
+              value={motorPower[port]}
+              onValueChange={value => handleMotorChange(port, value)}
+              minimumTrackTintColor={MOTOR_COLORS[port]}
+              maximumTrackTintColor={LegoColors.lightGray}
+              thumbTintColor={MOTOR_COLORS[port]}
+              disabled={disabled}
+            />
+          </View>
+          <View style={styles.sliderLabels}>
+            <Text style={styles.sliderLabel}>-100</Text>
+            <Text style={styles.sliderLabelCenter}>0</Text>
+            <Text style={styles.sliderLabel}>+100</Text>
+          </View>
+        </View>
+      </LegoCard>
+    );
   };
-
-  const renderMotorSlider = (port: keyof MotorState, label: string, description: string) => (
-    <LegoCard color={MOTOR_COLORS[port]} style={styles.motorCard} key={port}>
-      <View style={styles.motorHeader}>
-        <View style={styles.motorTitleRow}>
-          <View style={[styles.motorBadge, { backgroundColor: MOTOR_COLORS[port] }]}>
-            <Text style={styles.motorBadgeText}>{port}</Text>
-          </View>
-          <View>
-            <Text style={styles.motorLabel}>{label}</Text>
-            <Text style={styles.motorDescription}>{description}</Text>
-          </View>
-        </View>
-        <Text style={[styles.motorValue, { color: MOTOR_COLORS[port] }]}>
-          {motorPower[port]}%
-        </Text>
-      </View>
-
-      <View style={styles.sliderContainer}>
-        <View style={styles.sliderTrack}>
-          <Slider
-            style={styles.slider}
-            minimumValue={-100}
-            maximumValue={100}
-            step={5}
-            value={motorPower[port]}
-            onValueChange={(value) => handleMotorChange(port, value)}
-            onSlidingComplete={(value) => handleSlidingComplete(port, value)}
-            minimumTrackTintColor={MOTOR_COLORS[port]}
-            maximumTrackTintColor={LegoColors.lightGray}
-            thumbTintColor={MOTOR_COLORS[port]}
-            disabled={!isConnected}
-          />
-        </View>
-        <View style={styles.sliderLabels}>
-          <Text style={styles.sliderLabel}>-100</Text>
-          <Text style={styles.sliderLabelCenter}>0</Text>
-          <Text style={styles.sliderLabel}>+100</Text>
-        </View>
-      </View>
-
-      <View style={styles.motorStats}>
-        <Ionicons name="speedometer" size={16} color={LegoColors.darkGray} />
-        <Text style={styles.motorStatsText}>
-          Angle: {deviceInfo.ports[port]?.angle || 0}°
-        </Text>
-      </View>
-    </LegoCard>
-  );
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -124,35 +101,22 @@ export default function MotorsScreen() {
 
       <View style={styles.header}>
         <Text style={styles.title}>MOTOR CONTROL</Text>
-        <Text style={styles.subtitle}>Slide to control each motor's power</Text>
+        <Text style={styles.subtitle}>
+          {model.name}: slide to run a motor, it keeps running until you slide back to 0
+        </Text>
       </View>
 
-      {renderMotorSlider('A', 'Motor A', 'Left drive motor')}
-      {renderMotorSlider('B', 'Motor B', 'Right drive motor')}
-      {renderMotorSlider('C', 'Motor C', 'External port')}
-      {renderMotorSlider('D', 'Motor D', 'External port')}
+      {PORTS.map(renderMotorSlider)}
 
-      <LegoCard color={LegoColors.yellow} style={styles.helpCard}>
-        <Text style={styles.helpTitle}>MOTOR PORTS</Text>
-        <View style={styles.helpGrid}>
-          <View style={styles.helpItem}>
-            <View style={[styles.helpDot, { backgroundColor: LegoColors.blue }]} />
-            <Text style={styles.helpText}>A - Left drive</Text>
-          </View>
-          <View style={styles.helpItem}>
-            <View style={[styles.helpDot, { backgroundColor: LegoColors.green }]} />
-            <Text style={styles.helpText}>B - Right drive</Text>
-          </View>
-          <View style={styles.helpItem}>
-            <View style={[styles.helpDot, { backgroundColor: LegoColors.orange }]} />
-            <Text style={styles.helpText}>C - External</Text>
-          </View>
-          <View style={styles.helpItem}>
-            <View style={[styles.helpDot, { backgroundColor: LegoColors.red }]} />
-            <Text style={styles.helpText}>D - External</Text>
-          </View>
-        </View>
-      </LegoCard>
+      <View style={styles.stopContainer}>
+        <LegoBrickButton
+          onPress={stopAll}
+          title="Stop all motors"
+          color={LegoColors.red}
+          size="medium"
+          icon={<Ionicons name="stop" size={20} color={LegoColors.white} />}
+        />
+      </View>
     </ScrollView>
   );
 }
@@ -197,6 +161,16 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: '500',
   },
+  motorTitleText: {
+    flex: 1,
+  },
+  sliderDisabled: {
+    opacity: 0.35,
+  },
+  stopContainer: {
+    alignItems: 'center',
+    marginVertical: LegoSpacing.lg,
+  },
   motorCard: {
     marginBottom: LegoSpacing.md,
   },
@@ -209,6 +183,8 @@ const styles = StyleSheet.create({
   motorTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    marginRight: LegoSpacing.sm,
   },
   motorBadge: {
     width: 36,

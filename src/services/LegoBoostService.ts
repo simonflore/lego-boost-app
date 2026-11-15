@@ -1,47 +1,70 @@
 /**
- * LEGO Boost BLE Service for React Native
- * Handles Bluetooth communication with LEGO Boost Move Hub
+ * LEGO BOOST Move Hub over BLE (LEGO Wireless Protocol 3.0)
  */
 
-import { BleManager, Device, Characteristic } from 'react-native-ble-plx';
+import { PermissionsAndroid, Platform } from 'react-native';
+import { BleManager, Characteristic, Device, State, Subscription } from 'react-native-ble-plx';
 import { Buffer } from 'buffer';
 import {
-  LEGO_BOOST_SERVICE_UUID,
-  LEGO_BOOST_CHARACTERISTIC_UUID,
-  PortId,
-  MessageType,
-  MotorSubCommand,
-  LedColor,
-  DeviceInfo,
-  ControlData,
+  AiState,
+  AttachedDevice,
   BoostConfiguration,
-  DEFAULT_DEVICE_INFO,
   DEFAULT_CONFIGURATION,
-  ControlState,
+  DeviceInfo,
+  ExternalPort,
+  IoType,
+  LedColor,
+  LEGO_BOOST_CHARACTERISTIC_UUID,
+  LEGO_BOOST_SERVICE_UUID,
+  MessageType,
+  PortId,
+  createDeviceInfo,
 } from '../types/lego-boost';
 
 type ConnectionCallback = (connected: boolean) => void;
 type DeviceInfoCallback = (info: DeviceInfo) => void;
+type AiStateCallback = (state: AiState) => void;
+
+const SCAN_TIMEOUT_MS = 15000;
+const NOTIFY_INTERVAL_MS = 100;
+const MOVE_HUB_SYSTEM_TYPE = 0x40;
+const LEGO_COMPANY_ID = 0x0397;
+
+const AI_SPEED = 50;
+const AI_OBSTACLE_CM = 12;
+const AI_BACK_MS = 800;
+const AI_TURN_MS = 700;
+const AI_TICK_MS = 100;
+
+const COLOR_NAMES = [
+  'black', 'pink', 'purple', 'blue', 'light blue',
+  'cyan', 'green', 'yellow', 'orange', 'red', 'white',
+];
+
+const clampPower = (v: number) => Math.max(-100, Math.min(100, Math.round(v)));
 
 class LegoBoostService {
   private manager: BleManager;
   private device: Device | null = null;
   private characteristic: Characteristic | null = null;
+  private subscriptions: Subscription[] = [];
   private configuration: BoostConfiguration = { ...DEFAULT_CONFIGURATION };
-  private _deviceInfo: DeviceInfo = { ...DEFAULT_DEVICE_INFO };
-  private _controlData: ControlData = {
-    input: '',
-    speed: 0,
-    turnAngle: 0,
-  };
+  private _deviceInfo: DeviceInfo = createDeviceInfo();
+  private connecting = false;
+
+  // Virtual port for synchronised A+B. Firmware 2.x reports it on connect
+  // (usually 0x10); 0x39 was the pre-LWP3 address and is ignored by current hubs.
+  private abPort: number = PortId.AB;
+  private sensorPort: number = PortId.C;
 
   private connectionCallbacks: ConnectionCallback[] = [];
   private deviceInfoCallbacks: DeviceInfoCallback[] = [];
-  private aiRunning: boolean = false;
-  // Virtual port for synchronised A+B. Firmware 2.x reports it on connect
-  // (usually 0x10); 0x39 was the pre-LWP3 address and is ignored by current hubs.
-  private abPort: number = 0x10;
-  private aiInterval: ReturnType<typeof setInterval> | null = null;
+  private aiCallbacks: AiStateCallback[] = [];
+  private notifyTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private _aiState: AiState = 'Stopped';
+  private aiTimer: ReturnType<typeof setInterval> | null = null;
+  private aiUntil = 0;
 
   constructor() {
     this.manager = new BleManager();
@@ -51,15 +74,20 @@ class LegoBoostService {
     return this._deviceInfo;
   }
 
-  get controlData(): ControlData {
-    return this._controlData;
-  }
-
   get isConnected(): boolean {
     return this._deviceInfo.connected;
   }
 
-  // Subscribe to connection changes
+  get aiState(): AiState {
+    return this._aiState;
+  }
+
+  get isAiRunning(): boolean {
+    return this._aiState !== 'Stopped';
+  }
+
+  // ---------------------------------------------------------------- events
+
   onConnectionChange(callback: ConnectionCallback): () => void {
     this.connectionCallbacks.push(callback);
     return () => {
@@ -67,7 +95,6 @@ class LegoBoostService {
     };
   }
 
-  // Subscribe to device info updates
   onDeviceInfoChange(callback: DeviceInfoCallback): () => void {
     this.deviceInfoCallbacks.push(callback);
     return () => {
@@ -75,185 +102,252 @@ class LegoBoostService {
     };
   }
 
+  onAiStateChange(callback: AiStateCallback): () => void {
+    this.aiCallbacks.push(callback);
+    return () => {
+      this.aiCallbacks = this.aiCallbacks.filter(cb => cb !== callback);
+    };
+  }
+
   private notifyConnectionChange(connected: boolean): void {
     this.connectionCallbacks.forEach(cb => cb(connected));
   }
 
-  private notifyDeviceInfoChange(): void {
-    this.deviceInfoCallbacks.forEach(cb => cb(this._deviceInfo));
+  /**
+   * Sensors report many times a second; batch them so the UI re-renders at
+   * most every NOTIFY_INTERVAL_MS. Connection-level changes go out at once.
+   */
+  private notifyDeviceInfoChange(immediate = false): void {
+    if (immediate) {
+      if (this.notifyTimer) clearTimeout(this.notifyTimer);
+      this.flushDeviceInfo();
+      return;
+    }
+    if (this.notifyTimer) return;
+    this.notifyTimer = setTimeout(() => this.flushDeviceInfo(), NOTIFY_INTERVAL_MS);
   }
 
-  // Request Bluetooth permissions (for Android)
-  async requestPermissions(): Promise<boolean> {
-    try {
-      const state = await this.manager.state();
-      if (state === 'PoweredOn') {
-        return true;
+  private flushDeviceInfo(): void {
+    this.notifyTimer = null;
+    const info = this._deviceInfo;
+    const snapshot: DeviceInfo = { ...info, tilt: { ...info.tilt }, attached: { ...info.attached } };
+    this.deviceInfoCallbacks.forEach(cb => cb(snapshot));
+  }
+
+  private setAiState(state: AiState): void {
+    if (this._aiState === state) return;
+    this._aiState = state;
+    this.aiCallbacks.forEach(cb => cb(state));
+  }
+
+  private setError(message: string): void {
+    this._deviceInfo.error = message;
+    this.notifyDeviceInfoChange(true);
+  }
+
+  // ------------------------------------------------------------ connecting
+
+  /** Returns an error message, or null when Bluetooth is ready. */
+  private async ensureBluetooth(): Promise<string | null> {
+    if (Platform.OS === 'android') {
+      const perms =
+        Number(Platform.Version) >= 31
+          ? [
+              PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+              PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+            ]
+          : [PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION];
+      const result = await PermissionsAndroid.requestMultiple(perms);
+      if (perms.some(p => result[p] !== PermissionsAndroid.RESULTS.GRANTED)) {
+        return 'Bluetooth permission was denied.';
       }
-      // Wait for Bluetooth to be ready
-      return new Promise((resolve) => {
-        const subscription = this.manager.onStateChange((newState) => {
-          if (newState === 'PoweredOn') {
-            subscription.remove();
-            resolve(true);
-          }
-        }, true);
-
-        setTimeout(() => {
-          subscription.remove();
-          resolve(false);
-        }, 10000);
-      });
-    } catch (error) {
-      console.error('Permission error:', error);
-      return false;
     }
+
+    const state = await this.manager.state();
+    if (state === State.PoweredOn) return null;
+    if (state === State.Unauthorized) {
+      return 'Bluetooth access is off for this app. Turn it on in Settings.';
+    }
+    if (state === State.Unsupported) return 'This device does not support Bluetooth LE.';
+
+    // Unknown / Resetting / PoweredOff: give the radio a moment to come up.
+    const ready = await new Promise<boolean>(resolve => {
+      const timer = setTimeout(() => {
+        sub.remove();
+        resolve(false);
+      }, 5000);
+      const sub = this.manager.onStateChange(newState => {
+        if (newState === State.PoweredOn) {
+          clearTimeout(timer);
+          sub.remove();
+          resolve(true);
+        }
+      }, true);
+    });
+    if (ready) return null;
+    return state === State.PoweredOff ? 'Turn on Bluetooth to connect.' : 'Bluetooth is not ready.';
   }
 
-  // Scan and connect to LEGO Boost
-  async connect(config?: BoostConfiguration): Promise<boolean> {
-    if (config) {
-      this.configuration = { ...this.configuration, ...config };
-    }
+  async connect(config?: Partial<BoostConfiguration>): Promise<boolean> {
+    if (config) this.updateConfiguration(config);
+    if (this.isConnected) return true;
+    if (this.connecting) return false;
+    this.connecting = true;
 
     try {
-      const hasPermission = await this.requestPermissions();
-      if (!hasPermission) {
-        this._deviceInfo.error = 'Bluetooth permission denied or not available';
+      const bluetoothError = await this.ensureBluetooth();
+      if (bluetoothError) {
+        this.setError(bluetoothError);
         return false;
       }
 
       // After an app restart iOS often keeps the hub's BLE link open, so the hub
       // stops advertising and a scan never finds it. Reuse that link first.
       const alreadyConnected = await this.manager.connectedDevices([LEGO_BOOST_SERVICE_UUID]);
-      if (alreadyConnected.length > 0) {
-        console.log('Reusing system-connected hub:', alreadyConnected[0].name);
-        if (await this.attach(alreadyConnected[0])) return true;
+      for (const device of alreadyConnected) {
+        if (await this.attach(device)) return true;
       }
 
-      return new Promise((resolve) => {
-        console.log('Scanning for LEGO Boost...');
-        let settled = false;
-        const finish = (ok: boolean) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timeout);
-          resolve(ok);
-        };
-
-        this.manager.startDeviceScan(
-          [LEGO_BOOST_SERVICE_UUID],
-          { allowDuplicates: false },
-          async (error, scannedDevice) => {
-            if (error) {
-              console.error('Scan error:', error);
-              this._deviceInfo.error = error.message;
-              this.notifyDeviceInfoChange();
-              finish(false);
-              return;
-            }
-            if (scannedDevice && !settled) {
-              console.log('Found device:', scannedDevice.name);
-              this.manager.stopDeviceScan();
-              finish(await this.attach(scannedDevice));
-            }
-          }
-        );
-
-        // Stop scanning after 15 seconds
-        const timeout = setTimeout(() => {
-          this.manager.stopDeviceScan();
-          if (!this._deviceInfo.connected) {
-            this._deviceInfo.error = 'No LEGO Boost hub found. Make sure it is turned on.';
-            this.notifyDeviceInfoChange();
-          }
-          finish(this._deviceInfo.connected);
-        }, 15000);
-      });
+      return await this.scanAndAttach();
     } catch (error: any) {
       console.error('Connect error:', error);
-      this._deviceInfo.error = error.message;
-      this.notifyDeviceInfoChange();
+      this.setError(error?.message ?? 'Could not connect.');
       return false;
+    } finally {
+      this.connecting = false;
     }
   }
 
-  // Connect (or re-attach) to a hub and set up the LWP3 channel
-  private async attach(device: Device): Promise<boolean> {
-    try {
-      this.device = (await device.isConnected()) ? device : await device.connect();
-      console.log('Connected to device');
+  private scanAndAttach(): Promise<boolean> {
+    return new Promise(resolve => {
+      let settled = false;
 
-      await this.device.discoverAllServicesAndCharacteristics();
-      const characteristics = await this.device.characteristicsForService(
-        LEGO_BOOST_SERVICE_UUID
-      );
-      this.characteristic = characteristics.find(
-        c => c.uuid.toLowerCase() === LEGO_BOOST_CHARACTERISTIC_UUID.toLowerCase()
-      ) || null;
-      if (!this.characteristic) {
-        throw new Error('LEGO Boost characteristic not found');
-      }
+      const timeout = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        this.manager.stopDeviceScan();
+        this.setError('No LEGO BOOST hub found. Turn it on and press its green button.');
+        resolve(false);
+      }, SCAN_TIMEOUT_MS);
 
-      await this.setupNotifications();
-
-      this.device.onDisconnected(() => {
-        console.log('Device disconnected');
-        this._deviceInfo.connected = false;
-        this.device = null;
-        this.characteristic = null;
-        this.notifyConnectionChange(false);
-        this.notifyDeviceInfoChange();
+      this.manager.startDeviceScan([LEGO_BOOST_SERVICE_UUID], { allowDuplicates: false }, (error, device) => {
+        if (settled) return;
+        if (error) {
+          console.error('Scan error:', error);
+          settled = true;
+          clearTimeout(timeout);
+          this.manager.stopDeviceScan();
+          this.setError(error.message);
+          resolve(false);
+          return;
+        }
+        if (!device || !LegoBoostService.isMoveHub(device)) return;
+        settled = true; // claim it before the async attach
+        clearTimeout(timeout);
+        this.manager.stopDeviceScan();
+        this.attach(device).then(resolve);
       });
-
-      this._deviceInfo.connected = true;
-      this._deviceInfo.error = '';
-      this.notifyConnectionChange(true);
-      this.notifyDeviceInfoChange();
-
-      await this.activatePortNotifications();
-      return true;
-    } catch (connectError: any) {
-      console.error('Connection error:', connectError);
-      this.device = null;
-      this.characteristic = null;
-      this._deviceInfo.error = connectError.message;
-      this.notifyDeviceInfoChange();
-      return false;
-    }
-  }
-
-  // Setup notifications for incoming BLE data
-  private async setupNotifications(): Promise<void> {
-    if (!this.characteristic) return;
-
-    await this.characteristic.monitor((error, char) => {
-      if (error) {
-        console.error('Notification error:', error);
-        return;
-      }
-      if (char?.value) {
-        this.handleIncomingData(Buffer.from(char.value, 'base64'));
-      }
     });
   }
 
-  // Activate port notifications for sensors
-  private async activatePortNotifications(): Promise<void> {
-    // Activate distance/color sensor (port C)
-    await this.write([0x0a, 0x00, 0x41, 0x02, 0x08, 0x01, 0x00, 0x00, 0x00, 0x01]);
-    // Activate tilt sensor
-    await this.write([0x0a, 0x00, 0x41, 0x3a, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01]);
+  /** Other LEGO hubs share the service UUID; the advertisement says which hub it is. */
+  private static isMoveHub(device: Device): boolean {
+    if (!device.manufacturerData) return true;
+    const data = Buffer.from(device.manufacturerData, 'base64');
+    if (data.length < 4 || data.readUInt16LE(0) !== LEGO_COMPANY_ID) return true;
+    return data[3] === MOVE_HUB_SYSTEM_TYPE;
+  }
+
+  /** Connect (or re-attach) to a hub and open the LWP3 channel. */
+  private async attach(device: Device): Promise<boolean> {
+    this.clearSubscriptions();
+    try {
+      const connected = (await device.isConnected()) ? device : await device.connect();
+      await connected.discoverAllServicesAndCharacteristics();
+      const characteristics = await connected.characteristicsForService(LEGO_BOOST_SERVICE_UUID);
+      const characteristic = characteristics.find(
+        c => c.uuid.toLowerCase() === LEGO_BOOST_CHARACTERISTIC_UUID.toLowerCase()
+      );
+      if (!characteristic) throw new Error('This hub does not speak the LEGO protocol.');
+
+      this.device = connected;
+      this.characteristic = characteristic;
+      this.abPort = PortId.AB;
+      this.sensorPort = PortId.C;
+      this._deviceInfo = createDeviceInfo();
+
+      this.subscriptions.push(
+        // Errors here also fire on every disconnect; onDisconnected handles that.
+        characteristic.monitor((error, char) => {
+          if (!error && char?.value) this.handleIncomingData(Buffer.from(char.value, 'base64'));
+        }),
+        connected.onDisconnected(() => this.handleDisconnected(true)),
+      );
+
+      this._deviceInfo.connected = true;
+      this.notifyConnectionChange(true);
+      this.notifyDeviceInfoChange(true);
+
+      await this.subscribeSensors();
+      return true;
+    } catch (error: any) {
+      console.error('Connection error:', error);
+      this.clearSubscriptions();
+      this.device = null;
+      this.characteristic = null;
+      this.setError(error?.message ?? 'Could not connect to the hub.');
+      return false;
+    }
+  }
+
+  private clearSubscriptions(): void {
+    this.subscriptions.forEach(s => s.remove());
+    this.subscriptions = [];
+  }
+
+  private handleDisconnected(unexpected: boolean): void {
+    this.clearSubscriptions();
+    this.stopAiTimer();
+    this.device = null;
+    this.characteristic = null;
+    this._deviceInfo = createDeviceInfo();
+    if (unexpected) this._deviceInfo.error = 'The hub disconnected.';
+    this.notifyConnectionChange(false);
+    this.notifyDeviceInfoChange(true);
+  }
+
+  async disconnect(): Promise<void> {
+    const device = this.device;
+    this.handleDisconnected(false);
+    if (device) {
+      try {
+        await device.cancelConnection();
+      } catch (error) {
+        console.warn('Disconnect error:', error);
+      }
+    }
+  }
+
+  // ------------------------------------------------------------- incoming
+
+  private async subscribeSensors(): Promise<void> {
     // Battery: hub property 0x06. Enable pushed updates (0x02), then ask once (0x05).
     await this.write([0x05, 0x00, MessageType.HUB_PROPERTIES, 0x06, 0x02]);
     await this.write([0x05, 0x00, MessageType.HUB_PROPERTIES, 0x06, 0x05]);
+    // Tilt (mode 0: roll/pitch). The sensor port is re-subscribed if the hub
+    // announces it elsewhere; port C is the default for every official build.
+    await this.subscribePort(PortId.TILT, 0x00);
+    await this.subscribePort(this.sensorPort, 0x08);
   }
 
-  // Handle incoming data from the hub
-  private handleIncomingData(data: Buffer): void {
-    const messageType = data[2];
+  /** Port Input Format Setup: notify on every change of `mode`. */
+  private subscribePort(port: number, mode: number): Promise<void> {
+    return this.write([0x0a, 0x00, MessageType.PORT_INPUT_FORMAT_SETUP, port, mode, 0x01, 0x00, 0x00, 0x00, 0x01]);
+  }
 
-    switch (messageType) {
+  private handleIncomingData(data: Buffer): void {
+    if (data.length < 3) return;
+    switch (data[2]) {
       case MessageType.PORT_VALUE:
         this.handlePortValue(data);
         break;
@@ -261,349 +355,234 @@ class LegoBoostService {
         this.handleAttachedIO(data);
         break;
       case MessageType.HUB_PROPERTIES:
-        // [len, hub, 0x01, property, 0x06 = update, value...]
+        // [len, hub, 0x01, property, 0x06 = update, value]
         if (data[3] === 0x06 && data[4] === 0x06 && data.length >= 6) {
           this._deviceInfo.battery = data[5];
           this.notifyDeviceInfoChange();
         }
         break;
-      default:
-        // Other message types
+      case MessageType.GENERIC_ERROR:
+        console.warn('Hub error for command', data[3], 'code', data[4]);
         break;
     }
   }
 
   private handlePortValue(data: Buffer): void {
-    const portId = data[3];
+    const port = data[3];
 
-    // Distance/Color sensor (port C = 0x02)
-    if (portId === 0x02) {
-      if (data.length >= 6) {
-        const colorValue = data[4];
-        const distance = data[5];
-
-        this._deviceInfo.distance = distance;
-        this._deviceInfo.color = this.getColorName(colorValue);
-        this.notifyDeviceInfoChange();
-      }
-    }
-
-    // Tilt sensor (port 0x3a)
-    if (portId === 0x3a) {
-      if (data.length >= 6) {
-        const roll = data.readInt8(4);
-        const pitch = data.readInt8(5);
-        this._deviceInfo.tilt = { roll, pitch };
-        this.notifyDeviceInfoChange();
-      }
-    }
-
-    // Motor encoders
-    if (portId === PortId.A || portId === PortId.B) {
-      const portKey = portId === PortId.A ? 'A' : 'B';
-      if (data.length >= 8) {
-        const angle = data.readInt32LE(4);
-        this._deviceInfo.ports[portKey].angle = angle;
-        this.notifyDeviceInfoChange();
-      }
+    if (port === this.sensorPort && data.length >= 6) {
+      // Colour & distance sensor, mode 8: [colour, distance (inches), light, partial]
+      const color = data[4];
+      let inches = data[5];
+      const partial = data.length >= 8 ? data[7] : 0;
+      if (partial > 0) inches += 1 / partial;
+      this._deviceInfo.color = color === 0xff ? 'none' : COLOR_NAMES[color] ?? 'unknown';
+      this._deviceInfo.distance = Math.max(0, Math.round((inches * 25.4 - 20) / 10));
+      this.notifyDeviceInfoChange();
+    } else if (port === PortId.TILT && data.length >= 6) {
+      this._deviceInfo.tilt = { roll: data.readInt8(4), pitch: data.readInt8(5) };
+      this.notifyDeviceInfoChange();
     }
   }
 
   private handleAttachedIO(data: Buffer): void {
-    const portId = data[3];
+    if (data.length < 5) return;
+    const port = data[3];
     const event = data[4]; // 0 = detached, 1 = attached, 2 = attached virtual
 
     // Attached virtual: [len, hub, 0x04, port, 0x02, typeLo, typeHi, portA, portB]
     if (event === 0x02 && data.length >= 9) {
       const members = [data[7], data[8]].sort().join(',');
-      if (members === `${PortId.A},${PortId.B}`) {
-        this.abPort = portId;
-        console.log('Virtual AB port:', portId);
-      }
-    }
-    const portKey = this.getPortKey(portId);
-
-    if (portKey && this._deviceInfo.ports[portKey]) {
-      this._deviceInfo.ports[portKey].action = event === 0 ? 'detached' : 'attached';
-      this.notifyDeviceInfoChange();
-    }
-  }
-
-  private getPortKey(portId: number): keyof DeviceInfo['ports'] | null {
-    switch (portId) {
-      case PortId.A: return 'A';
-      case PortId.B: return 'B';
-      case PortId.C: return 'C';
-      case PortId.D: return 'D';
-      case PortId.LED: return 'LED';
-      default: return null;
-    }
-  }
-
-  private getColorName(value: number): string {
-    const colors = [
-      'black', 'pink', 'purple', 'blue', 'lightblue',
-      'cyan', 'green', 'yellow', 'orange', 'red', 'white'
-    ];
-    return colors[value] || 'unknown';
-  }
-
-  // Write raw data to the hub
-  async write(data: number[]): Promise<void> {
-    if (!this.characteristic || !this.device) {
-      console.warn('Not connected to LEGO Boost');
+      if (members === `${PortId.A},${PortId.B}`) this.abPort = port;
       return;
     }
 
-    try {
-      const buffer = Buffer.from(data);
-      const base64Data = buffer.toString('base64');
-      await this.characteristic.writeWithResponse(base64Data);
-    } catch (error) {
-      console.error('Write error:', error);
-    }
-  }
+    const key = (['A', 'B', 'C', 'D'] as ExternalPort[])[port];
+    if (!key) return;
 
-  // Disconnect from the hub
-  async disconnect(): Promise<void> {
-    this.stopAi();
-    if (this.device) {
-      try {
-        await this.device.cancelConnection();
-      } catch (error) {
-        console.error('Disconnect error:', error);
+    let kind: AttachedDevice = null;
+    if (event === 0x01 && data.length >= 7) {
+      const type = data.readUInt16LE(5);
+      if (type === IoType.COLOR_DISTANCE_SENSOR) {
+        kind = 'sensor';
+        if (this.sensorPort !== port) {
+          this.sensorPort = port;
+          this.subscribePort(port, 0x08);
+        }
+      } else if (type === IoType.EXTERNAL_MOTOR || type === IoType.INTERNAL_MOTOR) {
+        kind = 'motor';
       }
     }
-    this.device = null;
-    this.characteristic = null;
-    this._deviceInfo = { ...DEFAULT_DEVICE_INFO };
-    this.notifyConnectionChange(false);
+    this._deviceInfo.attached[key] = kind;
     this.notifyDeviceInfoChange();
   }
 
-  // LED Control
-  async led(color: LedColor | string | number): Promise<void> {
-    let colorValue: number;
+  // ------------------------------------------------------------- outgoing
 
-    if (typeof color === 'string') {
-      colorValue = this.getColorValue(color);
-    } else {
-      colorValue = color;
+  async write(data: number[]): Promise<void> {
+    const characteristic = this.characteristic;
+    if (!characteristic) return;
+    const payload = Buffer.from(data.map(v => v & 0xff)).toString('base64');
+    try {
+      // Without-response writes don't queue up behind acknowledgements, which
+      // keeps a 20 Hz gamepad stream responsive.
+      if (characteristic.isWritableWithoutResponse) {
+        await characteristic.writeWithoutResponse(payload);
+      } else {
+        await characteristic.writeWithResponse(payload);
+      }
+    } catch (error) {
+      console.warn('Write error:', error);
     }
-
-    await this.write([0x08, 0x00, 0x81, 0x32, 0x11, 0x51, 0x00, colorValue]);
   }
 
-  private getColorValue(colorName: string): number {
-    const colorMap: Record<string, number> = {
-      off: 0, pink: 1, purple: 2, blue: 3, lightblue: 4,
-      cyan: 5, green: 6, yellow: 7, orange: 8, red: 9, white: 10
-    };
-    return colorMap[colorName.toLowerCase()] ?? 0;
-  }
-
-  // Motor control - single port
-  async motorTime(port: string, seconds: number, power: number = 100): Promise<void> {
-    const portId = this.getPortId(port);
-    const time = Math.round(seconds * 1000);
-    const timeHigh = (time >> 8) & 0xff;
-    const timeLow = time & 0xff;
-    const motorPower = Math.max(-100, Math.min(100, Math.round(power)));
-
-    await this.write([
-      0x0c, 0x00, 0x81, portId, 0x11, 0x09,
-      timeLow, timeHigh, motorPower, 0x64, 0x7f, 0x03
-    ]);
-  }
-
-  // Continuous dual-motor control with no time limit (for analog stick input)
-  async driveWithPower(powerA: number, powerB: number): Promise<void> {
-    const pA = Math.max(-100, Math.min(100, Math.round(powerA)));
-    const pB = Math.max(-100, Math.min(100, Math.round(powerB)));
-    // 0x08 = StartSpeed(Speed1, Speed2, MaxPower, UseProfile) on the virtual AB port.
-    // Runs until the next command; no accel/decel profile so the stick feels direct.
-    await this.write([0x0a, 0x00, 0x81, this.abPort, 0x11, 0x08, pA, pB, 0x64, 0x00]);
-  }
-
-  // Continuous single-motor control (e.g. port D tool motor); 0 stops it
-  async motorSpeed(port: string, power: number): Promise<void> {
-    const portId = this.getPortId(port);
-    const p = Math.max(-100, Math.min(100, Math.round(power)));
-    // 0x07 = StartSpeed(Speed, MaxPower, UseProfile)
-    await this.write([0x09, 0x00, 0x81, portId, 0x11, 0x07, p, 0x64, 0x00]);
-  }
-
-  // Motor control - both A and B
-  async motorTimeMulti(seconds: number, powerA: number = 100, powerB: number = 100): Promise<void> {
-    const time = Math.round(seconds * 1000);
-    const timeHigh = (time >> 8) & 0xff;
-    const timeLow = time & 0xff;
-    const motorPowerA = Math.max(-100, Math.min(100, Math.round(powerA)));
-    const motorPowerB = Math.max(-100, Math.min(100, Math.round(powerB)));
-
-    await this.write([
-      0x0d, 0x00, 0x81, this.abPort, 0x11, 0x0a,
-      timeLow, timeHigh, motorPowerA, motorPowerB, 0x64, 0x7f, 0x03
-    ]);
-  }
-
-  // Motor angle control - single port
-  async motorAngle(port: string, angle: number, power: number = 100): Promise<void> {
-    const portId = this.getPortId(port);
-    const absAngle = Math.abs(Math.round(angle));
-    const motorPower = angle >= 0 ? Math.abs(power) : -Math.abs(power);
-
-    const angleBytes = [
-      absAngle & 0xff,
-      (absAngle >> 8) & 0xff,
-      (absAngle >> 16) & 0xff,
-      (absAngle >> 24) & 0xff
-    ];
-
-    await this.write([
-      0x0e, 0x00, 0x81, portId, 0x11, 0x0b,
-      ...angleBytes, motorPower, 0x64, 0x7f, 0x03
-    ]);
-  }
-
-  // Motor angle control - both A and B
-  async motorAngleMulti(angle: number, powerA: number = 100, powerB: number = 100): Promise<void> {
-    const absAngle = Math.abs(Math.round(angle));
-    const motorPowerA = angle >= 0 ? Math.abs(powerA) : -Math.abs(powerA);
-    const motorPowerB = angle >= 0 ? Math.abs(powerB) : -Math.abs(powerB);
-
-    const angleBytes = [
-      absAngle & 0xff,
-      (absAngle >> 8) & 0xff,
-      (absAngle >> 16) & 0xff,
-      (absAngle >> 24) & 0xff
-    ];
-
-    await this.write([
-      0x0f, 0x00, 0x81, this.abPort, 0x11, 0x0c,
-      ...angleBytes, motorPowerA, motorPowerB, 0x64, 0x7f, 0x03
-    ]);
-  }
-
-  // Stop motors
-  async stop(): Promise<void> {
-    await this.motorTimeMulti(0, 0, 0);
-    this._controlData.state = 'Stop';
-    this._controlData.speed = 0;
-    this._controlData.turnAngle = 0;
-  }
-
-  // Drive forward/backward
-  async drive(direction: number = 1): Promise<void> {
-    const power = direction >= 0 ? 100 : -100;
-    const finetune = this.configuration.driveFinetune || 1;
-    await this.motorTimeMulti(1 * finetune, power, power);
-    this._controlData.state = direction >= 0 ? 'Drive' : 'Back';
-    this._controlData.speed = power;
-  }
-
-  // Turn left/right
-  async turn(direction: number): Promise<void> {
-    const finetune = this.configuration.turnFinetune || 1;
-    const power = 70;
-
-    // Positive = right, negative = left
-    if (direction >= 0) {
-      await this.motorTimeMulti(0.5 * finetune, power, -power);
-    } else {
-      await this.motorTimeMulti(0.5 * finetune, -power, power);
-    }
-    this._controlData.state = 'Turn';
-    this._controlData.turnAngle = direction;
-  }
-
-  // Drive to a direction (continuous)
-  async driveToDirection(direction: number = 1): Promise<void> {
-    const power = direction >= 0 ? 100 : -100;
-    // Continuous drive - will run until stopped
-    await this.motorTimeMulti(10, power, power);
-    this._controlData.state = direction >= 0 ? 'Drive' : 'Back';
+  async led(color: LedColor | number): Promise<void> {
+    await this.write([0x08, 0x00, MessageType.PORT_OUTPUT, PortId.LED, 0x11, 0x51, 0x00, color]);
   }
 
   private getPortId(port: string): number {
-    const portMap: Record<string, number> = {
-      A: PortId.A,
-      B: PortId.B,
-      C: PortId.C,
-      D: PortId.D,
-      AB: this.abPort,
-      LED: PortId.LED,
-    };
-    return portMap[port.toUpperCase()] ?? PortId.A;
+    switch (port.toUpperCase()) {
+      case 'A': return PortId.A;
+      case 'B': return PortId.B;
+      case 'C': return PortId.C;
+      case 'D': return PortId.D;
+      case 'AB': return this.abPort;
+      default: throw new Error(`Unknown port ${port}`);
+    }
   }
 
-  // Update configuration
+  /** Map left/right drive power onto [A, B] using the model's layout. */
+  private toAB(left: number, right: number): [number, number] {
+    const sign = this.configuration.invertDrive ? -1 : 1;
+    const l = clampPower(left * sign);
+    const r = clampPower(right * sign);
+    return this.configuration.leftMotor === 'A' ? [l, r] : [r, l];
+  }
+
+  /** Single motor, for a fixed time, then brake. */
+  async motorTime(port: string, seconds: number, power: number = 100): Promise<void> {
+    const time = Math.max(0, Math.min(0xffff, Math.round(seconds * 1000)));
+    // 0x09 = StartSpeedForTime(Time, Speed, MaxPower, EndState=brake, UseProfile)
+    await this.write([
+      0x0c, 0x00, MessageType.PORT_OUTPUT, this.getPortId(port), 0x11, 0x09,
+      time & 0xff, time >> 8, clampPower(power), 0x64, 0x7f, 0x03,
+    ]);
+  }
+
+  /** Single motor, continuous until the next command; 0 stops it. */
+  async motorSpeed(port: string, power: number): Promise<void> {
+    // 0x07 = StartSpeed(Speed, MaxPower, UseProfile)
+    await this.write([0x09, 0x00, MessageType.PORT_OUTPUT, this.getPortId(port), 0x11, 0x07, clampPower(power), 0x64, 0x00]);
+  }
+
+  /** Both drive motors, continuous until the next command. */
+  async driveWithPower(left: number, right: number): Promise<void> {
+    const [a, b] = this.toAB(left, right);
+    // 0x08 = StartSpeed(Speed1, Speed2, MaxPower, UseProfile) on the virtual AB port.
+    await this.write([0x0a, 0x00, MessageType.PORT_OUTPUT, this.abPort, 0x11, 0x08, a, b, 0x64, 0x00]);
+  }
+
+  /** Both drive motors, for a fixed time, then brake. */
+  private async driveForTime(seconds: number, left: number, right: number): Promise<void> {
+    const [a, b] = this.toAB(left, right);
+    const time = Math.max(0, Math.min(0xffff, Math.round(seconds * 1000)));
+    // 0x0a = StartSpeedForTime for two motors
+    await this.write([
+      0x0d, 0x00, MessageType.PORT_OUTPUT, this.abPort, 0x11, 0x0a,
+      time & 0xff, time >> 8, a, b, 0x64, 0x7f, 0x03,
+    ]);
+  }
+
+  /** Stop the drive motors. */
+  async stop(): Promise<void> {
+    await this.driveWithPower(0, 0);
+  }
+
+  /** Stop the drive motors and any motor on C or D. */
+  async stopAll(): Promise<void> {
+    await this.stop();
+    for (const port of ['C', 'D'] as const) {
+      if (this._deviceInfo.attached[port] !== 'sensor') await this.motorSpeed(port, 0);
+    }
+  }
+
+  /** Short burst forward (1) or backward (-1). */
+  async drive(direction: number = 1): Promise<void> {
+    const power = direction >= 0 ? 100 : -100;
+    await this.driveForTime(1 * this.configuration.driveFinetune, power, power);
+  }
+
+  /** Short spin right (1) or left (-1). */
+  async turn(direction: number): Promise<void> {
+    const power = direction >= 0 ? 70 : -70;
+    await this.driveForTime(0.5 * this.configuration.turnFinetune, power, -power);
+  }
+
   updateConfiguration(config: Partial<BoostConfiguration>): void {
     this.configuration = { ...this.configuration, ...config };
   }
 
-  // AI Mode - automatic obstacle avoidance
-  startAi(): void {
-    if (this.aiRunning) return;
-    this.aiRunning = true;
-    this._controlData.state = 'Seek';
+  // ---------------------------------------------------------------- AI mode
 
-    this.aiInterval = setInterval(async () => {
-      if (!this.aiRunning || !this._deviceInfo.connected) {
+  /** Drive until something is within AI_OBSTACLE_CM, back off, turn, repeat. */
+  startAi(): void {
+    if (this.aiTimer || !this.isConnected) return;
+    this.setAiState('Drive');
+    this.driveWithPower(AI_SPEED, AI_SPEED);
+
+    this.aiTimer = setInterval(() => {
+      if (!this.isConnected) {
         this.stopAi();
         return;
       }
-
+      const now = Date.now();
       const distance = this._deviceInfo.distance;
-      const currentState = this._controlData.state;
 
-      if (distance > 0 && distance < 30) {
-        // Object detected - back up and turn
-        if (currentState !== 'Back') {
-          this._controlData.state = 'Back';
-          await this.drive(-1);
-        }
-      } else if (currentState === 'Back') {
-        // Done backing up - turn
-        this._controlData.state = 'Turn';
-        const turnDir = Math.random() > 0.5 ? 1 : -1;
-        await this.turn(turnDir);
-      } else if (currentState === 'Turn') {
-        // Done turning - seek again
-        this._controlData.state = 'Seek';
-        await this.drive(1);
-      } else {
-        // Keep driving forward
-        if (currentState !== 'Drive') {
-          this._controlData.state = 'Drive';
-          await this.drive(1);
-        }
+      switch (this._aiState) {
+        case 'Drive':
+          if (distance != null && distance < AI_OBSTACLE_CM) {
+            this.setAiState('Back');
+            this.aiUntil = now + AI_BACK_MS;
+            this.driveWithPower(-AI_SPEED, -AI_SPEED);
+          }
+          break;
+        case 'Back':
+          if (now >= this.aiUntil) {
+            const dir = Math.random() > 0.5 ? 1 : -1;
+            this.setAiState('Turn');
+            this.aiUntil = now + AI_TURN_MS * this.configuration.turnFinetune;
+            this.driveWithPower(dir * AI_SPEED, -dir * AI_SPEED);
+          }
+          break;
+        case 'Turn':
+          if (now >= this.aiUntil) {
+            this.setAiState('Drive');
+            this.driveWithPower(AI_SPEED, AI_SPEED);
+          }
+          break;
       }
-    }, 500);
+    }, AI_TICK_MS);
+  }
+
+  private stopAiTimer(): void {
+    if (this.aiTimer) {
+      clearInterval(this.aiTimer);
+      this.aiTimer = null;
+    }
+    this.setAiState('Stopped');
   }
 
   stopAi(): void {
-    this.aiRunning = false;
-    if (this.aiInterval) {
-      clearInterval(this.aiInterval);
-      this.aiInterval = null;
-    }
-    this._controlData.state = 'Manual';
-    this.stop();
+    const wasRunning = this.aiTimer != null;
+    this.stopAiTimer();
+    if (wasRunning && this.isConnected) this.stop();
   }
 
-  get isAiRunning(): boolean {
-    return this.aiRunning;
-  }
-
-  // Cleanup
   destroy(): void {
-    this.stopAi();
     this.disconnect();
     this.manager.destroy();
   }
 }
 
-// Singleton instance
 export const legoBoostService = new LegoBoostService();
 export default LegoBoostService;

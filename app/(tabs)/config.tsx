@@ -5,28 +5,20 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Switch,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
 import { useBoost } from '../../src/context/BoostContext';
+import { ROBOT_MODELS, getRobotModel } from '../../src/models/robotModels';
+import { DEFAULT_CONFIGURATION } from '../../src/types/lego-boost';
 import { LegoColors, LegoSpacing, LegoBorderRadius } from '../../src/theme/colors';
 import { LegoCard, LegoBrickButton } from '../../src/components/LegoComponents';
 
-const MOTOR_PRESETS = [
-  { name: 'VERNIE', leftMotor: 'A' as const, rightMotor: 'B' as const, icon: 'body' },
-  { name: 'CAR (A/B BACK)', leftMotor: 'B' as const, rightMotor: 'A' as const, icon: 'car-sport' },
-  { name: 'CAR (A/B FRONT)', leftMotor: 'A' as const, rightMotor: 'B' as const, icon: 'car' },
-];
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 export default function ConfigScreen() {
-  const { configuration, updateConfiguration } = useBoost();
-
-  const handlePresetSelect = (preset: typeof MOTOR_PRESETS[0]) => {
-    updateConfiguration({
-      leftMotor: preset.leftMotor,
-      rightMotor: preset.rightMotor,
-    });
-  };
+  const { configuration, updateConfiguration, selectModel, model } = useBoost();
 
   const handleDriveFinetuneChange = (value: number) => {
     updateConfiguration({ driveFinetune: value });
@@ -37,13 +29,17 @@ export default function ConfigScreen() {
   };
 
   const handleReset = () => {
+    const preset = getRobotModel(configuration.modelId);
     updateConfiguration({
-      leftMotor: 'A',
-      rightMotor: 'B',
-      driveFinetune: 1,
-      turnFinetune: 1,
+      ...DEFAULT_CONFIGURATION,
+      modelId: preset.id,
+      leftMotor: preset.leftMotor,
+      rightMotor: preset.rightMotor,
+      invertDrive: preset.invertDrive,
     });
   };
+
+  const swapped = configuration.leftMotor === 'B';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -52,64 +48,93 @@ export default function ConfigScreen() {
         <Text style={styles.subtitle}>Configure your robot</Text>
       </View>
 
-      {/* Motor Presets */}
+      {/* Robot model */}
       <LegoCard color={LegoColors.blue} style={styles.card}>
-        <Text style={styles.cardTitle}>MOTOR CONFIGURATION</Text>
+        <Text style={styles.cardTitle}>ROBOT MODEL</Text>
         <Text style={styles.cardDescription}>
-          Select a preset based on your LEGO Boost model
+          Pick what you built. This sets how the motors drive and what each port does.
         </Text>
 
         <View style={styles.presetContainer}>
-          {MOTOR_PRESETS.map((preset) => {
-            const isActive =
-              configuration.leftMotor === preset.leftMotor &&
-              configuration.rightMotor === preset.rightMotor;
+          {ROBOT_MODELS.map(preset => {
+            const isActive = configuration.modelId === preset.id;
             return (
               <TouchableOpacity
-                key={preset.name}
-                style={[
-                  styles.presetButton,
-                  isActive && styles.presetButtonActive,
-                ]}
-                onPress={() => handlePresetSelect(preset)}
+                key={preset.id}
+                style={[styles.presetButton, isActive && styles.presetButtonActive]}
+                onPress={() => selectModel(preset.id)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: isActive }}
               >
                 <Ionicons
-                  name={preset.icon as any}
+                  name={preset.icon as IconName}
                   size={24}
                   color={isActive ? LegoColors.white : LegoColors.darkGray}
                 />
-                <Text style={[
-                  styles.presetButtonText,
-                  isActive && styles.presetButtonTextActive,
-                ]}>
-                  {preset.name}
-                </Text>
+                <View style={styles.presetTextBlock}>
+                  <Text style={[styles.presetButtonText, isActive && styles.presetButtonTextActive]}>
+                    {preset.name.toUpperCase()}
+                  </Text>
+                  <Text style={[styles.presetDescription, isActive && styles.presetButtonTextActive]}>
+                    {preset.description}
+                  </Text>
+                </View>
               </TouchableOpacity>
             );
           })}
         </View>
 
         <View style={styles.motorAssignment}>
-          <View style={styles.motorRow}>
-            <Text style={styles.motorLabel}>LEFT MOTOR</Text>
-            <View style={[styles.motorBadge, { backgroundColor: LegoColors.blue }]}>
-              <Text style={styles.motorBadgeText}>{configuration.leftMotor}</Text>
+          {(['A', 'B', 'C', 'D'] as const).map(port => (
+            <View key={port} style={styles.motorRow}>
+              <View style={[styles.motorBadge, { backgroundColor: LegoColors.blue }]}>
+                <Text style={styles.motorBadgeText}>{port}</Text>
+              </View>
+              <Text style={styles.portText}>{model.ports[port]}</Text>
             </View>
-          </View>
-          <View style={styles.motorRow}>
-            <Text style={styles.motorLabel}>RIGHT MOTOR</Text>
-            <View style={[styles.motorBadge, { backgroundColor: LegoColors.green }]}>
-              <Text style={styles.motorBadgeText}>{configuration.rightMotor}</Text>
-            </View>
-          </View>
+          ))}
+          {!model.drives && (
+            <Text style={styles.noDriveNote}>
+              This model doesn’t drive, so the drive controls are off. Motors D, A and B still work from the Motors tab.
+            </Text>
+          )}
         </View>
+
+        {model.drives && (
+          <View style={styles.switches}>
+            <View style={styles.switchRow}>
+              <View style={styles.switchText}>
+                <Text style={styles.sliderLabel}>Reverse direction</Text>
+                <Text style={styles.switchHint}>Use if forward drives backwards</Text>
+              </View>
+              <Switch
+                value={configuration.invertDrive}
+                onValueChange={value => updateConfiguration({ invertDrive: value })}
+                trackColor={{ true: LegoColors.blue, false: LegoColors.lightGray }}
+              />
+            </View>
+            <View style={styles.switchRow}>
+              <View style={styles.switchText}>
+                <Text style={styles.sliderLabel}>Swap left and right</Text>
+                <Text style={styles.switchHint}>Use if steering left turns right</Text>
+              </View>
+              <Switch
+                value={swapped}
+                onValueChange={value =>
+                  updateConfiguration(value ? { leftMotor: 'B', rightMotor: 'A' } : { leftMotor: 'A', rightMotor: 'B' })
+                }
+                trackColor={{ true: LegoColors.blue, false: LegoColors.lightGray }}
+              />
+            </View>
+          </View>
+        )}
       </LegoCard>
 
       {/* Fine-tuning */}
       <LegoCard color={LegoColors.orange} style={styles.card}>
         <Text style={styles.cardTitle}>FINE-TUNING</Text>
         <Text style={styles.cardDescription}>
-          Adjust if your robot doesn't drive straight
+          Adjust if your robot doesn’t drive straight
         </Text>
 
         {/* Drive Finetune */}
@@ -120,7 +145,7 @@ export default function ConfigScreen() {
               <Text style={styles.sliderLabel}>Drive Modifier</Text>
             </View>
             <Text style={[styles.sliderValue, { color: LegoColors.orange }]}>
-              {(configuration.driveFinetune || 1).toFixed(2)}x
+              {configuration.driveFinetune.toFixed(2)}x
             </Text>
           </View>
           <View style={styles.sliderTrack}>
@@ -129,7 +154,7 @@ export default function ConfigScreen() {
               minimumValue={0.5}
               maximumValue={2}
               step={0.01}
-              value={configuration.driveFinetune || 1}
+              value={configuration.driveFinetune}
               onValueChange={handleDriveFinetuneChange}
               minimumTrackTintColor={LegoColors.orange}
               maximumTrackTintColor={LegoColors.lightGray}
@@ -150,7 +175,7 @@ export default function ConfigScreen() {
               <Text style={styles.sliderLabel}>Turn Modifier</Text>
             </View>
             <Text style={[styles.sliderValue, { color: LegoColors.blue }]}>
-              {(configuration.turnFinetune || 1).toFixed(2)}x
+              {configuration.turnFinetune.toFixed(2)}x
             </Text>
           </View>
           <View style={styles.sliderTrack}>
@@ -159,7 +184,7 @@ export default function ConfigScreen() {
               minimumValue={0.5}
               maximumValue={2}
               step={0.01}
-              value={configuration.turnFinetune || 1}
+              value={configuration.turnFinetune}
               onValueChange={handleTurnFinetuneChange}
               minimumTrackTintColor={LegoColors.blue}
               maximumTrackTintColor={LegoColors.lightGray}
@@ -191,13 +216,13 @@ export default function ConfigScreen() {
           <View style={styles.tipItem}>
             <View style={[styles.tipDot, { backgroundColor: LegoColors.blue }]} />
             <Text style={styles.tipText}>
-              <Text style={styles.tipBold}>Vernie:</Text> Standard humanoid robot
+              <Text style={styles.tipBold}>Model:</Text> Pick your build first; it sets the motor layout
             </Text>
           </View>
           <View style={styles.tipItem}>
             <View style={[styles.tipDot, { backgroundColor: LegoColors.orange }]} />
             <Text style={styles.tipText}>
-              <Text style={styles.tipBold}>Drive:</Text> Increase if robot doesn't go far enough
+              <Text style={styles.tipBold}>Drive:</Text> Increase if robot doesn’t go far enough
             </Text>
           </View>
           <View style={styles.tipItem}>
@@ -278,8 +303,47 @@ const styles = StyleSheet.create({
     backgroundColor: LegoColors.blue,
     borderColor: '#003d8f',
   },
-  presetButtonText: {
+  presetTextBlock: {
     marginLeft: LegoSpacing.md,
+    flex: 1,
+  },
+  presetDescription: {
+    fontSize: 12,
+    color: LegoColors.mediumGray,
+    marginTop: 2,
+  },
+  portText: {
+    flex: 1,
+    marginLeft: LegoSpacing.md,
+    fontSize: 13,
+    color: LegoColors.darkGray,
+    fontWeight: '600',
+  },
+  noDriveNote: {
+    marginTop: LegoSpacing.sm,
+    fontSize: 12,
+    color: LegoColors.darkGray,
+    lineHeight: 17,
+  },
+  switches: {
+    marginTop: LegoSpacing.md,
+    gap: LegoSpacing.sm,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  switchText: {
+    flex: 1,
+    marginRight: LegoSpacing.md,
+  },
+  switchHint: {
+    fontSize: 12,
+    color: LegoColors.mediumGray,
+    marginTop: 2,
+  },
+  presetButtonText: {
     fontWeight: '800',
     fontSize: 14,
     color: LegoColors.darkGray,
@@ -295,7 +359,6 @@ const styles = StyleSheet.create({
   },
   motorRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: LegoSpacing.xs,
   },

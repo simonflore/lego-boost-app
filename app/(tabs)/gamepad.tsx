@@ -5,17 +5,23 @@ import { useBoost } from '../../src/context/BoostContext';
 import { useGamepad, SPEED_LEVELS } from '../../src/hooks/useGamepad';
 import { LegoColors, LegoSpacing, LegoBorderRadius, LegoShadow } from '../../src/theme/colors';
 
-const BUTTON_MAP = [
-  { input: 'Left stick', action: 'Drive + steer (analog)' },
-  { input: 'R2 / L2', action: 'Throttle forward / reverse' },
-  { input: 'D-pad', action: 'Full-power drive / turn while held' },
-  { input: 'Right stick ↑↓', action: 'Arm / shooter (motor D)' },
-  { input: 'A (✕)', action: 'Fire: short burst on motor D' },
-  { input: 'X (□)', action: 'Reverse burst' },
-  { input: 'B (○)', action: 'Stop everything (hold to brake)' },
-  { input: 'Y (△)', action: 'Cycle LED color' },
-  { input: 'L1 / R1', action: 'Speed cap down / up' },
-];
+function buttonMap(toolLabel: string, drives: boolean) {
+  return [
+    ...(drives
+      ? [
+          { input: 'Left stick', action: 'Drive + steer (analog)' },
+          { input: 'R2 / L2', action: 'Throttle forward / reverse' },
+          { input: 'D-pad', action: 'Full-power drive / turn while held' },
+        ]
+      : []),
+    { input: 'Right stick ↑↓', action: `${toolLabel} (motor D)` },
+    { input: 'A (✕)', action: `Short burst on ${toolLabel.toLowerCase()}` },
+    ...(drives ? [{ input: 'X (□)', action: 'Reverse burst' }] : []),
+    { input: 'B (○)', action: 'Stop everything (hold to brake)' },
+    { input: 'Y (△)', action: 'Cycle LED color' },
+    ...(drives ? [{ input: 'L1 / R1', action: 'Speed cap down / up' }] : []),
+  ];
+}
 
 function StickIndicator({ x, y, label }: { x: number; y: number; label: string }) {
   const SIZE = 100;
@@ -41,7 +47,7 @@ function StickIndicator({ x, y, label }: { x: number; y: number; label: string }
 }
 
 export default function GamepadScreen() {
-  const { isConnected } = useBoost();
+  const { isConnected, model } = useBoost();
   const { available, controllerConnected, controllerName, throttle, steer, speedLevel, seen } = useGamepad();
 
   return (
@@ -89,8 +95,8 @@ export default function GamepadScreen() {
 
       {/* Button mapping */}
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Button Mapping</Text>
-        {BUTTON_MAP.map(({ input, action }) => (
+        <Text style={styles.sectionTitle}>Button Mapping · {model.name}</Text>
+        {buttonMap(model.toolLabel, model.drives).map(({ input, action }) => (
           <View key={input} style={styles.mapRow}>
             <Text style={styles.mapInput}>{input}</Text>
             <Text style={styles.mapAction}>{action}</Text>

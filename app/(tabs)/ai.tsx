@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,61 +6,46 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useBoost } from '../../src/context/BoostContext';
+import type { AiState } from '../../src/types/lego-boost';
 import { LegoColors, LegoSpacing, LegoBorderRadius } from '../../src/theme/colors';
 import { LegoCard, LegoBrickButton, LegoBadge } from '../../src/components/LegoComponents';
 
-const STATE_CONFIG: Record<string, { color: string; icon: string }> = {
-  Drive: { color: LegoColors.green, icon: 'arrow-up-circle' },
-  Back: { color: LegoColors.orange, icon: 'arrow-down-circle' },
-  Turn: { color: LegoColors.blue, icon: 'refresh-circle' },
-  Seek: { color: '#6435c9', icon: 'search-circle' },
-  Manual: { color: LegoColors.darkGray, icon: 'hand-left' },
-  Stopped: { color: LegoColors.red, icon: 'pause-circle' },
+const STATE_CONFIG: Record<AiState, { color: string; icon: string; label: string }> = {
+  Drive: { color: LegoColors.green, icon: 'arrow-up-circle', label: 'Driving' },
+  Back: { color: LegoColors.orange, icon: 'arrow-down-circle', label: 'Backing up' },
+  Turn: { color: LegoColors.blue, icon: 'refresh-circle', label: 'Turning' },
+  Stopped: { color: LegoColors.red, icon: 'pause-circle', label: 'Stopped' },
 };
 
 export default function AiScreen() {
-  const { isConnected, boost, deviceInfo } = useBoost();
-  const [isRunning, setIsRunning] = useState(false);
-  const [currentState, setCurrentState] = useState<string>('Stopped');
+  const { isConnected, boost, deviceInfo, model } = useBoost();
+  const [currentState, setCurrentState] = useState<AiState>(boost.aiState);
+  const isRunning = currentState !== 'Stopped';
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (isRunning) {
-        setCurrentState(boost.controlData.state || 'Unknown');
-      }
-    }, 200);
+  useEffect(() => boost.onAiStateChange(setCurrentState), [boost]);
 
-    return () => clearInterval(interval);
-  }, [isRunning]);
-
-  useEffect(() => {
-    return () => {
-      if (boost.isAiRunning) {
-        boost.stopAi();
-      }
-    };
-  }, []);
+  // Never leave the robot driving on its own behind another tab.
+  useFocusEffect(
+    useCallback(() => () => boost.stopAi(), [boost])
+  );
 
   const handleToggleAi = () => {
     if (!isConnected) {
       Alert.alert('Not Connected', 'Please connect to LEGO Boost first.');
       return;
     }
-
-    if (isRunning) {
-      boost.stopAi();
-      setIsRunning(false);
-      setCurrentState('Stopped');
-    } else {
-      boost.startAi();
-      setIsRunning(true);
-      setCurrentState('Starting...');
+    if (!model.drives) {
+      Alert.alert('Not a driving model', `${model.name} doesn't drive. Pick a driving model in Settings.`);
+      return;
     }
+    if (isRunning) boost.stopAi();
+    else boost.startAi();
   };
 
-  const stateConfig = STATE_CONFIG[currentState] || STATE_CONFIG.Stopped;
+  const stateConfig = STATE_CONFIG[currentState];
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -89,7 +74,7 @@ export default function AiScreen() {
         <Text style={styles.stateLabel}>CURRENT STATE</Text>
         <LegoBadge
           color={stateConfig.color}
-          label={currentState.toUpperCase()}
+          label={stateConfig.label.toUpperCase()}
           icon={<Ionicons name={stateConfig.icon as any} size={24} color={LegoColors.white} />}
         />
       </View>
@@ -103,7 +88,7 @@ export default function AiScreen() {
             <View style={[styles.sensorIcon, { backgroundColor: LegoColors.blue }]}>
               <Ionicons name="resize" size={24} color={LegoColors.white} />
             </View>
-            <Text style={styles.sensorValue}>{deviceInfo.distance}</Text>
+            <Text style={styles.sensorValue}>{deviceInfo.distance ?? '–'}</Text>
             <Text style={styles.sensorLabel}>Distance (cm)</Text>
           </View>
 

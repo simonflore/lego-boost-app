@@ -20,8 +20,15 @@
       "bundleIdentifier": "com.legoboost.app",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to connect to and control your LEGO Boost robot.",
-        "NSBluetoothPeripheralUsageDescription": "This app uses Bluetooth to connect to and control your LEGO Boost robot.",
-        "UIBackgroundModes": ["bluetooth-central"]
+        "UIBackgroundModes": [
+          "bluetooth-central"
+        ],
+        "GCSupportedGameControllers": [
+          {
+            "ProfileName": "ExtendedGamepad"
+          }
+        ],
+        "GCSupportsControllerUserInteraction": true
       }
     },
     "android": {
@@ -48,16 +55,10 @@
         "react-native-ble-plx",
         {
           "isBackgroundEnabled": true,
-          "modes": ["peripheral", "central"],
+          "modes": [
+            "central"
+          ],
           "bluetoothAlwaysPermission": "This app uses Bluetooth to connect to and control your LEGO Boost robot."
-        }
-      ],
-      [
-        "expo-build-properties",
-        {
-          "ios": {
-            "deploymentTarget": "15.1"
-          }
         }
       ]
     ],

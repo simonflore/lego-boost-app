@@ -6,7 +6,7 @@ React Native Expo app for controlling LEGO Boost robots via Bluetooth Low Energy
 
 ## Tech Stack
 
-- **React Native** with Expo SDK 54
+- **React Native** 0.88 with Expo SDK 58 (continuous native generation: `ios/` is generated, not committed)
 - **Expo Router** for file-based navigation
 - **react-native-ble-plx** for Bluetooth LE
 - **TypeScript** throughout
@@ -16,6 +16,7 @@ React Native Expo app for controlling LEGO Boost robots via Bluetooth Low Energy
 - `src/services/LegoBoostService.ts` - Core BLE service implementing LEGO Wireless Protocol 3.0
 - `src/context/BoostContext.tsx` - React context providing boost service to all screens
 - `src/types/lego-boost.ts` - Type definitions for LEGO Boost protocol
+- `src/models/robotModels.ts` - Port layouts per BOOST build; drive mapping goes through `toAB()` in the service
 - `app/(tabs)/` - Tab screens (connect, control, motors, gamepad, ai, config)
 - `modules/boost-gamepad/` - Local Expo module (Swift, GCController); autolinked from `modules/`, run `pod install` after changing it
 - `src/hooks/useGamepad.ts` - Polls the pad at 20 Hz and maps it to motor commands
@@ -25,8 +26,13 @@ React Native Expo app for controlling LEGO Boost robots via Bluetooth Low Energy
 ```bash
 npm install          # Install dependencies
 npm start            # Start Expo dev server
+npm run lint         # ESLint (eslint-config-expo)
+npx tsc --noEmit     # Typecheck
+npx expo prebuild --platform ios --clean   # Regenerate ios/ after app.json changes
 npm run build:dev    # Build iOS development client via EAS
 ```
+
+CocoaPods needs `LANG=en_US.UTF-8` in this environment.
 
 ## Development Notes
 
@@ -39,6 +45,11 @@ LEGO Boost uses LEGO Wireless Protocol 3.0 over BLE:
 - Characteristic UUID: `00001624-1212-efde-1623-785feabcd123`
 
 Commands are sent as byte arrays. See `LegoBoostService.ts` for protocol implementation.
+
+### Protocol gotchas
+- The virtual A+B port is reported by the hub on connect (usually `0x10`); `0x39` is pre-LWP3 firmware and silently ignored.
+- Colour & distance sensor mode 8 reports distance in inches plus a partial byte; the service converts to cm.
+- Drive commands take left/right power; `toAB()` maps them using the model's `leftMotor` and `invertDrive`.
 
 ### Adding New Motor Commands
 1. Add method to `LegoBoostService.ts`

@@ -1,93 +1,116 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { legoBoostService } from '../services/LegoBoostService';
-import { DeviceInfo, BoostConfiguration, ControlMode, DEFAULT_DEVICE_INFO } from '../types/lego-boost';
+import {
+  BoostConfiguration,
+  ControlMode,
+  DEFAULT_CONFIGURATION,
+  DeviceInfo,
+  createDeviceInfo,
+} from '../types/lego-boost';
+import { RobotModel, RobotModelId, getRobotModel } from '../models/robotModels';
+
+const STORAGE_KEY = 'boost.configuration.v1';
 
 interface BoostContextType {
   isConnected: boolean;
+  isConnecting: boolean;
   deviceInfo: DeviceInfo;
   controlMode: ControlMode;
-  isConnecting: boolean;
   configuration: BoostConfiguration;
+  model: RobotModel;
   connect: () => Promise<boolean>;
   disconnect: () => Promise<void>;
   setControlMode: (mode: ControlMode) => void;
   updateConfiguration: (config: Partial<BoostConfiguration>) => void;
+  selectModel: (id: RobotModelId) => void;
   boost: typeof legoBoostService;
 }
 
 const BoostContext = createContext<BoostContextType | undefined>(undefined);
 
-interface BoostProviderProps {
-  children: ReactNode;
-}
-
-export function BoostProvider({ children }: BoostProviderProps) {
-  const [isConnected, setIsConnected] = useState(false);
+export function BoostProvider({ children }: { children: ReactNode }) {
+  const [isConnected, setIsConnected] = useState(legoBoostService.isConnected);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [deviceInfo, setDeviceInfo] = useState<DeviceInfo>(DEFAULT_DEVICE_INFO);
+  const [deviceInfo, setDeviceInfo] = useState<DeviceInfo>(createDeviceInfo);
   const [controlMode, setControlMode] = useState<ControlMode>(ControlMode.Click);
-  const [configuration, setConfiguration] = useState<BoostConfiguration>({
-    leftMotor: 'A',
-    rightMotor: 'B',
-    driveFinetune: 1,
-    turnFinetune: 1,
-  });
+  const [configuration, setConfiguration] = useState<BoostConfiguration>(DEFAULT_CONFIGURATION);
 
   useEffect(() => {
-    // Subscribe to connection changes
-    const unsubConnection = legoBoostService.onConnectionChange((connected) => {
-      setIsConnected(connected);
-    });
-
-    // Subscribe to device info updates
-    const unsubDeviceInfo = legoBoostService.onDeviceInfoChange((info) => {
-      setDeviceInfo({ ...info });
-    });
-
+    const unsubConnection = legoBoostService.onConnectionChange(setIsConnected);
+    const unsubDeviceInfo = legoBoostService.onDeviceInfoChange(setDeviceInfo);
     return () => {
       unsubConnection();
       unsubDeviceInfo();
     };
   }, []);
 
-  const connect = async (): Promise<boolean> => {
+  // Restore saved settings once.
+  useEffect(() => {
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then(raw => {
+        if (!raw) return;
+        const saved = { ...DEFAULT_CONFIGURATION, ...JSON.parse(raw) } as BoostConfiguration;
+        setConfiguration(saved);
+        legoBoostService.updateConfiguration(saved);
+      })
+      .catch(error => console.warn('Could not load settings:', error));
+  }, []);
+
+  const updateConfiguration = useCallback((config: Partial<BoostConfiguration>) => {
+    setConfiguration(prev => {
+      const next = { ...prev, ...config };
+      legoBoostService.updateConfiguration(next);
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(error =>
+        console.warn('Could not save settings:', error)
+      );
+      return next;
+    });
+  }, []);
+
+  const selectModel = useCallback(
+    (id: RobotModelId) => {
+      const model = getRobotModel(id);
+      updateConfiguration({
+        modelId: model.id,
+        leftMotor: model.leftMotor,
+        rightMotor: model.rightMotor,
+        invertDrive: model.invertDrive,
+      });
+    },
+    [updateConfiguration]
+  );
+
+  const connect = useCallback(async () => {
     setIsConnecting(true);
     try {
-      const success = await legoBoostService.connect(configuration);
-      return success;
+      return await legoBoostService.connect();
     } finally {
       setIsConnecting(false);
     }
-  };
+  }, []);
 
-  const disconnect = async (): Promise<void> => {
-    await legoBoostService.disconnect();
-  };
+  const disconnect = useCallback(() => legoBoostService.disconnect(), []);
 
-  const updateConfiguration = (config: Partial<BoostConfiguration>) => {
-    const newConfig = { ...configuration, ...config };
-    setConfiguration(newConfig);
-    legoBoostService.updateConfiguration(config);
-  };
-
-  const value: BoostContextType = {
-    isConnected,
-    deviceInfo,
-    controlMode,
-    isConnecting,
-    configuration,
-    connect,
-    disconnect,
-    setControlMode,
-    updateConfiguration,
-    boost: legoBoostService,
-  };
-
-  return (
-    <BoostContext.Provider value={value}>
-      {children}
-    </BoostContext.Provider>
+  const value = useMemo<BoostContextType>(
+    () => ({
+      isConnected,
+      isConnecting,
+      deviceInfo,
+      controlMode,
+      configuration,
+      model: getRobotModel(configuration.modelId),
+      connect,
+      disconnect,
+      setControlMode,
+      updateConfiguration,
+      selectModel,
+      boost: legoBoostService,
+    }),
+    [isConnected, isConnecting, deviceInfo, controlMode, configuration, connect, disconnect, updateConfiguration, selectModel]
   );
+
+  return <BoostContext.Provider value={value}>{children}</BoostContext.Provider>;
 }
 
 export function useBoost(): BoostContextType {
