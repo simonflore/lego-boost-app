@@ -95,7 +95,7 @@ export default function MotorsScreen() {
       {!isConnected && (
         <View style={styles.warningBanner}>
           <Ionicons name="warning" size={20} color={LegoColors.black} />
-          <Text style={styles.warningText}>CONNECT TO LEGO BOOST FIRST</Text>
+          <Text style={styles.warningText}>CONNECT TO YOUR HUB FIRST</Text>
         </View>
       )}
 

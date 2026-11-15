@@ -71,7 +71,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Connect',
-          headerTitle: 'LEGO BOOST',
+          headerTitle: 'BOOST CONTROL',
           tabBarIcon: tabIcon('bluetooth'),
         }}
       />

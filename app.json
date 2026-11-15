@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "LEGO Boost Control",
+    "name": "Boost Control",
     "slug": "lego-boost-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -19,7 +19,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.legoboost.app",
       "infoPlist": {
-        "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to connect to and control your LEGO Boost robot.",
+        "NSBluetoothAlwaysUsageDescription": "Boost Control uses Bluetooth to connect to and control your BOOST Move Hub.",
         "UIBackgroundModes": [
           "bluetooth-central"
         ],
@@ -28,7 +28,8 @@
             "ProfileName": "ExtendedGamepad"
           }
         ],
-        "GCSupportsControllerUserInteraction": true
+        "GCSupportsControllerUserInteraction": true,
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -58,7 +59,7 @@
           "modes": [
             "central"
           ],
-          "bluetoothAlwaysPermission": "This app uses Bluetooth to connect to and control your LEGO Boost robot."
+          "bluetoothAlwaysPermission": "Boost Control uses Bluetooth to connect to and control your BOOST Move Hub."
         }
       ]
     ],

@@ -131,7 +131,7 @@ export default function ConnectScreen() {
         <View style={styles.stepList}>
           <View style={styles.step}>
             <View style={styles.stepNumber}><Text style={styles.stepNumberText}>1</Text></View>
-            <Text style={styles.stepText}>Turn on your LEGO Boost Move Hub (green button, light blinks)</Text>
+            <Text style={styles.stepText}>Turn on your BOOST Move Hub (green button, light blinks)</Text>
           </View>
           <View style={styles.step}>
             <View style={styles.stepNumber}><Text style={styles.stepNumberText}>2</Text></View>

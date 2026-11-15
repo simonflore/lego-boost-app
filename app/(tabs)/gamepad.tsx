@@ -55,7 +55,7 @@ export default function GamepadScreen() {
       {!isConnected && (
         <View style={styles.warningBanner}>
           <Ionicons name="warning" size={16} color={LegoColors.black} />
-          <Text style={styles.warningText}>Not connected to LEGO Hub</Text>
+          <Text style={styles.warningText}>Not connected to the hub</Text>
         </View>
       )}
 

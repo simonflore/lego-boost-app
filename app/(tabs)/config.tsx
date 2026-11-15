@@ -8,6 +8,7 @@ import {
   Switch,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
+import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import { useBoost } from '../../src/context/BoostContext';
 import { ROBOT_MODELS, getRobotModel } from '../../src/models/robotModels';
@@ -239,9 +240,12 @@ export default function ConfigScreen() {
         <View style={styles.appInfoLogo}>
           <Ionicons name="cube" size={32} color={LegoColors.red} />
         </View>
-        <Text style={styles.appInfoName}>LEGO BOOST CONTROL</Text>
-        <Text style={styles.appInfoVersion}>Version 1.0.0</Text>
-        <Text style={styles.appInfoNote}>Built with React Native & Expo</Text>
+        <Text style={styles.appInfoName}>BOOST CONTROL</Text>
+        <Text style={styles.appInfoVersion}>Version {Constants.expoConfig?.version ?? '1.0.0'}</Text>
+        <Text style={styles.appInfoNote}>
+          Works with the LEGO® BOOST Move Hub (set 17101). LEGO and BOOST are trademarks of the LEGO
+          Group, which does not sponsor, authorise or endorse this app.
+        </Text>
       </View>
     </ScrollView>
   );
@@ -481,7 +485,10 @@ const styles = StyleSheet.create({
   appInfoNote: {
     fontSize: 12,
     color: LegoColors.mediumGray,
-    marginTop: 2,
+    marginTop: 6,
     fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 17,
+    paddingHorizontal: LegoSpacing.lg,
   },
 });

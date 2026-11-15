@@ -38,7 +38,7 @@ export default function ControlScreen() {
 
   const checkConnection = (): boolean => {
     if (!isConnected) {
-      Alert.alert('Not Connected', 'Please connect to LEGO Boost first.');
+      Alert.alert('Not Connected', 'Connect to your BOOST hub first.');
       return false;
     }
     return true;
@@ -79,7 +79,7 @@ export default function ControlScreen() {
         {!isConnected && (
           <View style={styles.warningBanner}>
             <Ionicons name="warning" size={20} color={LegoColors.black} />
-            <Text style={styles.warningText}>CONNECT TO LEGO BOOST FIRST</Text>
+            <Text style={styles.warningText}>CONNECT TO YOUR HUB FIRST</Text>
           </View>
         )}
         {isConnected && !model.drives && (
