@@ -71,6 +71,11 @@
     "experiments": {
       "typedRoutes": true,
       "baseUrl": "/app"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "dee5c6a7-28e5-42df-9585-291db22213df"
+      }
     }
   }
 }
